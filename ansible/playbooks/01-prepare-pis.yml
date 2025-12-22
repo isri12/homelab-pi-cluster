@@ -1,0 +1,133 @@
+---
+# This playbook prepares all Raspberry Pis for Kubernetes (k3s) installation
+# It updates the system, installs dependencies, configures cgroups, and disables swap
+
+# First play: Configure all Raspberry Pis
+- name: Prepare all Raspberry Pis
+  # Target all hosts in the k3s_cluster group (master + workers)
+  hosts: k3s_cluster
+  # Run tasks with sudo/root privileges (become: yes means run with sudo)
+  become: yes
+  
+  tasks:
+    # Task 1: Update system packages to latest versions
+    - name: Update system packages
+      apt:
+        # Update package manager cache (like apt-get update)
+        update_cache: yes
+        # Upgrade all packages to latest versions (like apt-get upgrade)
+        upgrade: dist
+        # Remove unnecessary packages (like apt-get autoremove)
+        autoremove: yes
+      # Save the result in a variable called 'update_result' for later use
+      register: update_result
+      
+    # Task 2: Show a message if packages were updated
+    - name: Show update results
+      debug:
+        # Print this message to console
+        msg: "System updated successfully"
+      # Only run this task if update_result.changed is true (packages were updated)
+      when: update_result.changed
+        
+    # Task 3: Install packages needed for Kubernetes and cluster management
+    - name: Install required packages
+      apt:
+        # List of packages to install
+        name:
+          - curl        # Tool to download files from the internet
+          - git         # Version control system
+          - vim         # Text editor
+          - htop        # System monitoring tool
+          - nfs-common  # Network File System tools for shared storage
+        # Ensure these packages are installed (state: present)
+        state: present
+        
+    # Task 4: Set the hostname (device name) for each Pi
+    - name: Set hostname
+      hostname:
+        # Use the inventory_hostname (the name we gave it in hosts.yml)
+        name: "{{ inventory_hostname }}"
+        
+    # Task 5: Update /etc/hosts file to map IP to hostname
+    - name: Update /etc/hosts
+      lineinfile:
+        # Edit this file
+        path: /etc/hosts
+        # Add this line: IP address followed by hostname
+        line: "{{ node_ip }} {{ inventory_hostname }}"
+        
+    # Task 6: Enable cgroups (control groups) - required for Kubernetes
+    # cgroups limit CPU and memory usage for containers
+    - name: Enable cgroups for Kubernetes
+      lineinfile:
+        # Edit the boot configuration file
+        path: /boot/firmware/cmdline.txt
+        # Use regex to find the line ending with "rootwait"
+        backrefs: yes
+        regexp: '^(.*rootwait.*)$'
+        # Add cgroup options to enable memory and CPU limits
+        line: '\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
+      # Save result to check if changes were made
+      register: cmdline_result
+      
+    # Task 7: Disable swap memory
+    # Kubernetes works better without swap, so we disable it
+    - name: Disable swap
+      shell: |
+        # Turn off swap immediately
+        dphys-swapfile swapoff || true
+        # Uninstall swap service
+        dphys-swapfile uninstall || true
+        # Disable swap service from starting at boot
+        systemctl disable dphys-swapfile || true
+      # Ignore errors if swap is not configured
+      ignore_errors: yes
+      
+    # Task 8: Reboot the system if cgroups were changed
+    - name: Reboot if cgroups changed
+      reboot:
+        # Wait up to 5 minutes (300 seconds) for reboot to complete
+        reboot_timeout: 300
+      # Only reboot if the cmdline.txt file was modified in Task 6
+      when: cmdline_result.changed
+      
+    # Task 9: Wait for the system to come back online after reboot
+    - name: Wait for system to come back online
+      wait_for_connection:
+        # Wait 30 seconds before trying to connect
+        delay: 30
+        # Stop trying after 5 minutes (300 seconds)
+        timeout: 300
+      # Only wait if the system was rebooted in Task 8
+      when: cmdline_result.changed
+
+# Second play: Verify that all preparations completed successfully
+- name: Verify preparation
+  # Check on all hosts in k3s_cluster
+  hosts: k3s_cluster
+  tasks:
+    # Task 1: Check what hostname is currently set
+    - name: Check hostname
+      command: hostname
+      # Save the output in a variable called 'hostname_check'
+      register: hostname_check
+      
+    # Task 2: Display the hostname we found
+    - name: Display hostnames
+      debug:
+        # Print the hostname that was returned from the previous task
+        msg: "Hostname: {{ hostname_check.stdout }}"
+        
+    # Task 3: Check if memory cgroup is enabled
+    - name: Check cgroups
+      # Run shell command to check /proc/cgroups file for memory cgroup
+      shell: cat /proc/cgroups | grep memory
+      # Save the result
+      register: cgroup_check
+      
+    # Task 4: Display cgroup status
+    - name: Display cgroup status
+      debug:
+        # Print whether memory cgroup is enabled
+        msg: "Memory cgroup enabled: {{ cgroup_check.stdout }}"
