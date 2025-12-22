@@ -95,7 +95,7 @@ Perfect for learning Kubernetes, DevOps practices, home automation, and self-hos
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 
-Network: 192.168.1.0/24
+Network: 
 Storage: NFS from Pi 4 (Future: Pi 5 NAS)
 ```
 
