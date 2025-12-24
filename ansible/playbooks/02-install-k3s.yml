@@ -1,0 +1,621 @@
+---
+# This playbook installs K3s (lightweight Kubernetes) on the cluster
+# It installs the K3s server on the master node and K3s agents on worker nodes
+
+# First play: Install K3s on the master node
+- name: Install K3s on master node
+  hosts: master
+  become: yes
+  
+  tasks:
+    # Task 1: Check if K3s is already installed
+    - name: Check if K3s is already installed
+      stat:
+        path: /usr/local/bin/k3s
+      register: k3s_installed
+      
+    # Task 2: Display if K3s is already installed
+    - name: K3s installation status
+      debug:
+        msg: "K3s is already installed, skipping installation"
+      when: k3s_installed.stat.exists
+      
+    # Task 3: Install K3s server on master node
+    - name: Install K3s server
+      shell: |
+        curl -sfL https://get.k3s.io | sh -s - server \
+          --write-kubeconfig-mode 644 \
+          --disable traefik \
+          --node-ip {{ node_ip }} \
+          --tls-san {{ node_ip }}
+      when: not k3s_installed.stat.exists
+      # --write-kubeconfig-mode 644: Makes kubeconfig readable
+      # --disable traefik: We'll use our own ingress controller later
+      # --node-ip: Sets the IP for this node
+      # --tls-san: Adds IP to certificate for secure access
+      
+    # Task 4: Wait for K3s to be ready
+    - name: Wait for K3s to be ready
+      wait_for:
+        path: /var/lib/rancher/k3s/server/node-token
+        timeout: 120
+      when: not k3s_installed.stat.exists
+        
+    # Task 5: Wait for K3s service to be active
+    - name: Wait for K3s service
+      systemd:
+        name: k3s
+        state: started
+      register: k3s_service
+      until: k3s_service.status.ActiveState == "active"
+      retries: 5
+      delay: 10
+      
+    # Task 6: Get the K3s node token (needed for workers to join)
+    - name: Get K3s token
+      slurp:
+        src: /var/lib/rancher/k3s/server/node-token
+      register: k3s_token
+      
+    # Task 7: Store token as a fact for use in worker installation
+    - name: Store token for workers
+      set_fact:
+        k3s_token_value: "{{ k3s_token.content | b64decode | trim }}"
+        
+    # Task 8: Get kubeconfig for local access
+    - name: Get kubeconfig
+      slurp:
+        src: /etc/rancher/k3s/k3s.yaml
+      register: k3s_kubeconfig
+      
+    # Task 9: Save kubeconfig to local machine
+    - name: Save kubeconfig locally
+      copy:
+        content: "{{ k3s_kubeconfig.content | b64decode }}"
+        dest: "{{ playbook_dir }}/../../kubeconfig"
+        mode: '0600'
+      delegate_to: localhost
+      become: no
+      
+    # Task 10: Display token for verification
+    - name: Display K3s token (first 20 chars)
+      debug:
+        msg: "K3s token: {{ k3s_token_value[:20] }}..."
+        
+    # Task 11: Wait for Kubernetes API to be ready
+    - name: Wait for Kubernetes API
+      command: kubectl get nodes
+      register: kubectl_result
+      until: kubectl_result.rc == 0
+      retries: 10
+      delay: 10
+      changed_when: false
+
+# Second play: Install K3s agent on worker nodes
+- name: Install K3s on worker nodes
+  hosts: workers
+  become: yes
+  
+  vars:
+    # Get master IP and token from master node facts
+    k3s_master_ip: "{{ hostvars['pi-master']['node_ip'] }}"
+    k3s_token: "{{ hostvars['pi-master']['k3s_token_value'] }}"
+  
+  tasks:
+    # Task 1: Check if K3s agent is already installed
+    - name: Check if K3s agent is already installed
+      stat:
+        path: /usr/local/bin/k3s
+      register: k3s_agent_installed
+      
+    # Task 2: Display if K3s agent is already installed
+    - name: K3s agent installation status
+      debug:
+        msg: "K3s agent is already installed on {{ inventory_hostname }}, skipping installation"
+      when: k3s_agent_installed.stat.exists
+      
+    # Task 3: Verify master token is available
+    - name: Verify master token exists
+      assert:
+        that:
+          - k3s_token is defined
+          - k3s_token | length > 0
+        fail_msg: "K3s token from master is not available"
+        success_msg: "K3s token received from master"
+        
+    # Task 4: Install K3s agent on worker nodes
+    - name: Install K3s agent
+      shell: |
+        curl -sfL https://get.k3s.io | K3S_URL=https://{{ k3s_master_ip }}:6443 \
+          K3S_TOKEN={{ k3s_token }} \
+          sh -s - agent \
+          --node-ip {{ node_ip }}
+      when: not k3s_agent_installed.stat.exists
+      # K3S_URL: Points to the master node API
+      # K3S_TOKEN: Authentication token from master
+      # agent: Installs as worker node, not server
+      # --node-ip: Sets the IP for this worker node
+      
+    # Task 5: Wait for K3s agent service to be ready
+    - name: Wait for K3s agent service
+      systemd:
+        name: k3s-agent
+        state: started
+      register: k3s_agent_service
+      until: k3s_agent_service.status.ActiveState == "active"
+      retries: 5
+      delay: 10
+      when: not k3s_agent_installed.stat.exists
+      
+    # Task 6: Display worker join status
+    - name: Worker node joined
+      debug:
+        msg: "Worker node {{ inventory_hostname }} successfully joined the cluster"
+
+# Third play: Verify cluster setup
+- name: Verify K3s cluster
+  hosts: master
+  become: yes
+  
+  tasks:
+    # Task 1: Wait for all nodes to be registered
+    - name: Wait for all nodes to appear in cluster
+      shell: kubectl get nodes --no-headers | wc -l
+      register: node_count
+      until: node_count.stdout | int == 3
+      retries: 20
+      delay: 10
+      changed_when: false
+      
+    # Task 2: Wait for all nodes to be Ready
+    - name: Wait for all nodes to be Ready
+      shell: kubectl get nodes --no-headers | grep -c " Ready"
+      register: ready_count
+      until: ready_count.stdout | int == 3
+      retries: 20
+      delay: 10
+      changed_when: false
+      
+    # Task 3: Get cluster status
+    - name: Get cluster nodes
+      command: kubectl get nodes -o wide
+      register: nodes_output
+      changed_when: false
+      
+    # Task 4: Display cluster nodes
+    - name: Display cluster status
+      debug:
+        msg: "{{ nodes_output.stdout_lines }}"
+        
+    # Task 5: Get system pods
+    - name: Check system pods
+      command: kubectl get pods -n kube-system
+      register: pods_output
+      changed_when: false
+      
+    # Task 6: Display system pods
+    - name: Display system pods
+      debug:
+        msg: "{{ pods_output.stdout_lines }}"
+        
+    # Task 7: Verify all nodes are Ready
+    - name: Verify all nodes are Ready
+      shell: kubectl get nodes --no-headers | grep -v " Ready" | wc -l
+      register: not_ready_count
+      failed_when: not_ready_count.stdout | int > 0
+      changed_when: false
+      
+    # Task 8: Create a test pod to verify cluster works
+    - name: Create test pod
+      shell: |
+        kubectl run test-pod --image=busybox --restart=Never --command -- sleep 3600
+      register: test_pod
+      changed_when: test_pod.rc == 0
+      failed_when: false
+      
+    # Task 9: Wait for test pod to be running
+    - name: Wait for test pod
+      shell: kubectl get pod test-pod -o jsonpath='{.status.phase}'
+      register: pod_status
+      until: pod_status.stdout == "Running"
+      retries: 10
+      delay: 5
+      changed_when: false
+      when: test_pod.rc == 0
+      
+    # Task 10: Delete test pod
+    - name: Delete test pod
+      command: kubectl delete pod test-pod --ignore-not-found=true
+      changed_when: false
+      
+    # Task 11: Get K3s version
+    - name: Get K3s version
+      command: k3s --version
+      register: k3s_version
+      changed_when: false
+      
+    # Task 12: Display K3s version
+    - name: Display K3s version
+      debug:
+        msg: "{{ k3s_version.stdout_lines[0] }}"
+        
+    # Task 13: Show kubeconfig location
+    - name: Kubeconfig saved
+      debug:
+        msg: 
+          - "Kubeconfig has been saved to: {{ playbook_dir }}/../../kubeconfig"
+          - "Copy it to ~/.kube/config to use kubectl locally"
+          - "Don't forget to update the server IP from 127.0.0.1 to {{ hostvars['pi-master']['node_ip'] }}"
+
+# Fourth play: Label nodes for workload placement
+- name: Label nodes
+  hosts: master
+  become: yes
+  
+  tasks:
+    # Task 1: Label master node
+    - name: Label master node
+      command: kubectl label node pi-master node-role.kubernetes.io/master=true --overwrite
+      changed_when: false
+      failed_when: false
+      
+    # Task 2: Label worker nodes
+    - name: Label worker nodes
+      command: kubectl label node {{ item }} node-role.kubernetes.io/worker=true --overwrite
+      loop:
+        - pi-worker1
+        - pi-worker2
+      changed_when: false
+      failed_when: false
+      
+    # Task 3: Verify labels
+    - name: Show node labels
+      command: kubectl get nodes --show-labels
+      register: node_labels
+      changed_when: false
+      
+    # Task 4: Display node labels
+    - name: Display node labels
+      debug:
+        msg: "{{ node_labels.stdout_lines }}"
+
+# Final summary
+- name: Installation summary
+  hosts: localhost
+  gather_facts: no
+  
+  tasks:
+    - name: Display summary
+      debug:
+        msg:
+          - "=========================================="
+          - "K3s Cluster Installation Complete!"
+          - "=========================================="
+          - ""
+          - "Cluster Details:"
+          - "  Master Node: pi-master ({{ hostvars['pi-master']['node_ip'] }})"
+          - "  Worker Node 1: pi-worker1 ({{ hostvars['pi-worker1']['node_ip'] }})"
+          - "  Worker Node 2: pi-worker2 ({{ hostvars['pi-worker2']['node_ip'] }})"
+          - ""
+          - "Next Steps:"
+          - "  1. Copy kubeconfig to your local machine:"
+          - "     cp kubeconfig ~/.kube/config"
+          - "  2. Update server IP in kubeconfig:"
+          - "     sed -i 's/127.0.0.1/{{ hostvars['pi-master']['node_ip'] }}/g' ~/.kube/config"
+          - "  3. Test cluster access:"
+          - "     kubectl get nodes"
+          - "  4. Run storage setup playbook:"
+          - "     ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-storage.yml --ask-vault-pass"
+          - ""
+          - "=========================================="
+EOFcat > ansible/playbooks/02-install-k3s.yml << 'EOF'
+---
+# This playbook installs K3s (lightweight Kubernetes) on the cluster
+# It installs the K3s server on the master node and K3s agents on worker nodes
+
+# First play: Install K3s on the master node
+- name: Install K3s on master node
+  hosts: master
+  become: yes
+  
+  tasks:
+    # Task 1: Check if K3s is already installed
+    - name: Check if K3s is already installed
+      stat:
+        path: /usr/local/bin/k3s
+      register: k3s_installed
+      
+    # Task 2: Display if K3s is already installed
+    - name: K3s installation status
+      debug:
+        msg: "K3s is already installed, skipping installation"
+      when: k3s_installed.stat.exists
+      
+    # Task 3: Install K3s server on master node
+    - name: Install K3s server
+      shell: |
+        curl -sfL https://get.k3s.io | sh -s - server \
+          --write-kubeconfig-mode 644 \
+          --disable traefik \
+          --node-ip {{ node_ip }} \
+          --tls-san {{ node_ip }}
+      when: not k3s_installed.stat.exists
+      # --write-kubeconfig-mode 644: Makes kubeconfig readable
+      # --disable traefik: We'll use our own ingress controller later
+      # --node-ip: Sets the IP for this node
+      # --tls-san: Adds IP to certificate for secure access
+      
+    # Task 4: Wait for K3s to be ready
+    - name: Wait for K3s to be ready
+      wait_for:
+        path: /var/lib/rancher/k3s/server/node-token
+        timeout: 120
+      when: not k3s_installed.stat.exists
+        
+    # Task 5: Wait for K3s service to be active
+    - name: Wait for K3s service
+      systemd:
+        name: k3s
+        state: started
+      register: k3s_service
+      until: k3s_service.status.ActiveState == "active"
+      retries: 5
+      delay: 10
+      
+    # Task 6: Get the K3s node token (needed for workers to join)
+    - name: Get K3s token
+      slurp:
+        src: /var/lib/rancher/k3s/server/node-token
+      register: k3s_token
+      
+    # Task 7: Store token as a fact for use in worker installation
+    - name: Store token for workers
+      set_fact:
+        k3s_token_value: "{{ k3s_token.content | b64decode | trim }}"
+        
+    # Task 8: Get kubeconfig for local access
+    - name: Get kubeconfig
+      slurp:
+        src: /etc/rancher/k3s/k3s.yaml
+      register: k3s_kubeconfig
+      
+    # Task 9: Save kubeconfig to local machine
+    - name: Save kubeconfig locally
+      copy:
+        content: "{{ k3s_kubeconfig.content | b64decode }}"
+        dest: "{{ playbook_dir }}/../../kubeconfig"
+        mode: '0600'
+      delegate_to: localhost
+      become: no
+      
+    # Task 10: Display token for verification
+    - name: Display K3s token (first 20 chars)
+      debug:
+        msg: "K3s token: {{ k3s_token_value[:20] }}..."
+        
+    # Task 11: Wait for Kubernetes API to be ready
+    - name: Wait for Kubernetes API
+      command: kubectl get nodes
+      register: kubectl_result
+      until: kubectl_result.rc == 0
+      retries: 10
+      delay: 10
+      changed_when: false
+
+# Second play: Install K3s agent on worker nodes
+- name: Install K3s on worker nodes
+  hosts: workers
+  become: yes
+  
+  vars:
+    # Get master IP and token from master node facts
+    k3s_master_ip: "{{ hostvars['pi-master']['node_ip'] }}"
+    k3s_token: "{{ hostvars['pi-master']['k3s_token_value'] }}"
+  
+  tasks:
+    # Task 1: Check if K3s agent is already installed
+    - name: Check if K3s agent is already installed
+      stat:
+        path: /usr/local/bin/k3s
+      register: k3s_agent_installed
+      
+    # Task 2: Display if K3s agent is already installed
+    - name: K3s agent installation status
+      debug:
+        msg: "K3s agent is already installed on {{ inventory_hostname }}, skipping installation"
+      when: k3s_agent_installed.stat.exists
+      
+    # Task 3: Verify master token is available
+    - name: Verify master token exists
+      assert:
+        that:
+          - k3s_token is defined
+          - k3s_token | length > 0
+        fail_msg: "K3s token from master is not available"
+        success_msg: "K3s token received from master"
+        
+    # Task 4: Install K3s agent on worker nodes
+    - name: Install K3s agent
+      shell: |
+        curl -sfL https://get.k3s.io | K3S_URL=https://{{ k3s_master_ip }}:6443 \
+          K3S_TOKEN={{ k3s_token }} \
+          sh -s - agent \
+          --node-ip {{ node_ip }}
+      when: not k3s_agent_installed.stat.exists
+      # K3S_URL: Points to the master node API
+      # K3S_TOKEN: Authentication token from master
+      # agent: Installs as worker node, not server
+      # --node-ip: Sets the IP for this worker node
+      
+    # Task 5: Wait for K3s agent service to be ready
+    - name: Wait for K3s agent service
+      systemd:
+        name: k3s-agent
+        state: started
+      register: k3s_agent_service
+      until: k3s_agent_service.status.ActiveState == "active"
+      retries: 5
+      delay: 10
+      when: not k3s_agent_installed.stat.exists
+      
+    # Task 6: Display worker join status
+    - name: Worker node joined
+      debug:
+        msg: "Worker node {{ inventory_hostname }} successfully joined the cluster"
+
+# Third play: Verify cluster setup
+- name: Verify K3s cluster
+  hosts: master
+  become: yes
+  
+  tasks:
+    # Task 1: Wait for all nodes to be registered
+    - name: Wait for all nodes to appear in cluster
+      shell: kubectl get nodes --no-headers | wc -l
+      register: node_count
+      until: node_count.stdout | int == 3
+      retries: 20
+      delay: 10
+      changed_when: false
+      
+    # Task 2: Wait for all nodes to be Ready
+    - name: Wait for all nodes to be Ready
+      shell: kubectl get nodes --no-headers | grep -c " Ready"
+      register: ready_count
+      until: ready_count.stdout | int == 3
+      retries: 20
+      delay: 10
+      changed_when: false
+      
+    # Task 3: Get cluster status
+    - name: Get cluster nodes
+      command: kubectl get nodes -o wide
+      register: nodes_output
+      changed_when: false
+      
+    # Task 4: Display cluster nodes
+    - name: Display cluster status
+      debug:
+        msg: "{{ nodes_output.stdout_lines }}"
+        
+    # Task 5: Get system pods
+    - name: Check system pods
+      command: kubectl get pods -n kube-system
+      register: pods_output
+      changed_when: false
+      
+    # Task 6: Display system pods
+    - name: Display system pods
+      debug:
+        msg: "{{ pods_output.stdout_lines }}"
+        
+    # Task 7: Verify all nodes are Ready
+    - name: Verify all nodes are Ready
+      shell: kubectl get nodes --no-headers | grep -v " Ready" | wc -l
+      register: not_ready_count
+      failed_when: not_ready_count.stdout | int > 0
+      changed_when: false
+      
+    # Task 8: Create a test pod to verify cluster works
+    - name: Create test pod
+      shell: |
+        kubectl run test-pod --image=busybox --restart=Never --command -- sleep 3600
+      register: test_pod
+      changed_when: test_pod.rc == 0
+      failed_when: false
+      
+    # Task 9: Wait for test pod to be running
+    - name: Wait for test pod
+      shell: kubectl get pod test-pod -o jsonpath='{.status.phase}'
+      register: pod_status
+      until: pod_status.stdout == "Running"
+      retries: 10
+      delay: 5
+      changed_when: false
+      when: test_pod.rc == 0
+      
+    # Task 10: Delete test pod
+    - name: Delete test pod
+      command: kubectl delete pod test-pod --ignore-not-found=true
+      changed_when: false
+      
+    # Task 11: Get K3s version
+    - name: Get K3s version
+      command: k3s --version
+      register: k3s_version
+      changed_when: false
+      
+    # Task 12: Display K3s version
+    - name: Display K3s version
+      debug:
+        msg: "{{ k3s_version.stdout_lines[0] }}"
+        
+    # Task 13: Show kubeconfig location
+    - name: Kubeconfig saved
+      debug:
+        msg: 
+          - "Kubeconfig has been saved to: {{ playbook_dir }}/../../kubeconfig"
+          - "Copy it to ~/.kube/config to use kubectl locally"
+          - "Don't forget to update the server IP from 127.0.0.1 to {{ hostvars['pi-master']['node_ip'] }}"
+
+# Fourth play: Label nodes for workload placement
+- name: Label nodes
+  hosts: master
+  become: yes
+  
+  tasks:
+    # Task 1: Label master node
+    - name: Label master node
+      command: kubectl label node pi-master node-role.kubernetes.io/master=true --overwrite
+      changed_when: false
+      failed_when: false
+      
+    # Task 2: Label worker nodes
+    - name: Label worker nodes
+      command: kubectl label node {{ item }} node-role.kubernetes.io/worker=true --overwrite
+      loop:
+        - pi-worker1
+        - pi-worker2
+      changed_when: false
+      failed_when: false
+      
+    # Task 3: Verify labels
+    - name: Show node labels
+      command: kubectl get nodes --show-labels
+      register: node_labels
+      changed_when: false
+      
+    # Task 4: Display node labels
+    - name: Display node labels
+      debug:
+        msg: "{{ node_labels.stdout_lines }}"
+
+# Final summary
+- name: Installation summary
+  hosts: localhost
+  gather_facts: no
+  
+  tasks:
+    - name: Display summary
+      debug:
+        msg:
+          - "=========================================="
+          - "K3s Cluster Installation Complete!"
+          - "=========================================="
+          - ""
+          - "Cluster Details:"
+          - "  Master Node: pi-master ({{ hostvars['pi-master']['node_ip'] }})"
+          - "  Worker Node 1: pi-worker1 ({{ hostvars['pi-worker1']['node_ip'] }})"
+          - "  Worker Node 2: pi-worker2 ({{ hostvars['pi-worker2']['node_ip'] }})"
+          - ""
+          - "Next Steps:"
+          - "  1. Copy kubeconfig to your local machine:"
+          - "     cp kubeconfig ~/.kube/config"
+          - "  2. Update server IP in kubeconfig:"
+          - "     sed -i 's/127.0.0.1/{{ hostvars['pi-master']['node_ip'] }}/g' ~/.kube/config"
+          - "  3. Test cluster access:"
+          - "     kubectl get nodes"
+          - "  4. Run storage setup playbook:"
+          - "     ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-storage.yml --ask-vault-pass"
+          - ""
+          - "=========================================="

@@ -1,0 +1,216 @@
+---
+# This playbook sets up USB storage on the master node and configures NFS
+# for shared storage across the Kubernetes cluster
+
+# Configuration variables
+# These can be overridden when running the playbook
+- name: Setup USB storage on master node
+  hosts: master
+  become: yes
+  
+  vars:
+    # USB device path - adjust if your USB drive is different
+    # Run 'lsblk' on the Pi to find your USB drive
+    usb_device: /dev/sda1
+    # Where to mount the USB drive
+    mount_point: /mnt/storage
+    # Network range that can access NFS shares
+    nfs_export_network: 10.0.0.0/24
+  
+  tasks:
+    # Task 1: Install NFS server packages
+    - name: Install NFS server
+      apt:
+        name:
+          - nfs-kernel-server  # NFS server daemon
+          - nfs-common         # NFS client tools
+        state: present
+        update_cache: yes
+        
+    # Task 2: Create the mount point directory
+    - name: Create mount point
+      file:
+        path: "{{ mount_point }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+        
+    # Task 3: Check if USB drive exists
+    - name: Check if USB drive exists
+      stat:
+        path: "{{ usb_device }}"
+      register: usb_check
+      
+    # Task 4: Display warning if USB drive not found
+    - name: Warn if USB drive not found
+      debug:
+        msg: "WARNING: USB drive {{ usb_device }} not found. Please check 'lsblk' output and update usb_device variable."
+      when: not usb_check.stat.exists
+      
+    # Task 5: Check if device is already formatted
+    - name: Check existing filesystem
+      shell: blkid {{ usb_device }} | grep -o 'TYPE="[^"]*"' | cut -d'"' -f2
+      register: existing_fs
+      changed_when: false
+      failed_when: false
+      when: usb_check.stat.exists
+      
+    # Task 6: Format USB drive with ext4 filesystem
+    - name: Format USB drive (ext4)
+      filesystem:
+        fstype: ext4
+        dev: "{{ usb_device }}"
+        opts: -L k8s-storage  # Label the filesystem
+      when: 
+        - usb_check.stat.exists
+        - existing_fs.stdout != "ext4"
+      
+    # Task 7: Get UUID of USB drive for reliable mounting
+    - name: Get UUID of USB drive
+      command: blkid -s UUID -o value {{ usb_device }}
+      register: usb_uuid
+      changed_when: false
+      when: usb_check.stat.exists
+      
+    # Task 8: Mount USB drive and add to /etc/fstab for persistence
+    - name: Mount USB drive
+      mount:
+        path: "{{ mount_point }}"
+        src: "UUID={{ usb_uuid.stdout }}"
+        fstype: ext4
+        opts: defaults,nofail  # nofail = don't block boot if drive missing
+        state: mounted
+      when: usb_check.stat.exists
+      
+    # Task 9: Create directories for each application
+    - name: Create storage directories
+      file:
+        path: "{{ mount_point }}/{{ item }}"
+        state: directory
+        mode: '0777'  # Full permissions for NFS clients
+        owner: root
+        group: root
+      loop:
+        - pihole
+        - home-assistant
+        - n8n
+        - grafana
+        - prometheus
+        - backups
+      when: usb_check.stat.exists
+      
+    # Task 10: Configure NFS exports
+    - name: Configure NFS exports
+      lineinfile:
+        path: /etc/exports
+        line: "{{ mount_point }} {{ nfs_export_network }}(rw,sync,no_subtree_check,no_root_squash)"
+        create: yes
+      notify: restart nfs
+      when: usb_check.stat.exists
+      
+    # Task 11: Enable NFS server to start on boot
+    - name: Enable NFS server
+      systemd:
+        name: nfs-kernel-server
+        enabled: yes
+        state: started
+        
+  # Handlers run when notified by tasks
+  handlers:
+    - name: restart nfs
+      systemd:
+        name: nfs-kernel-server
+        state: restarted
+      # After restarting, re-export the shares
+      listen: restart nfs
+        
+    - name: export nfs shares
+      command: exportfs -ra
+      listen: restart nfs
+
+# Second play: Mount NFS on worker nodes
+- name: Mount NFS on worker nodes
+  hosts: workers
+  become: yes
+  
+  vars:
+    # Get master node IP from inventory
+    nfs_server: "{{ hostvars['pi-master']['node_ip'] }}"
+    mount_point: /mnt/storage
+  
+  tasks:
+    # Task 1: Install NFS client packages
+    - name: Install NFS client
+      apt:
+        name: nfs-common
+        state: present
+        update_cache: yes
+        
+    # Task 2: Create mount point directory
+    - name: Create mount point
+      file:
+        path: "{{ mount_point }}"
+        state: directory
+        mode: '0755'
+        
+    # Task 3: Wait for NFS server to be ready
+    - name: Wait for NFS server
+      wait_for:
+        host: "{{ nfs_server }}"
+        port: 2049  # NFS port
+        timeout: 60
+        
+    # Task 4: Mount NFS share
+    - name: Mount NFS share
+      mount:
+        path: "{{ mount_point }}"
+        src: "{{ nfs_server }}:/mnt/storage"
+        fstype: nfs
+        opts: defaults,_netdev  # _netdev = mount after network is up
+        state: mounted
+        
+    # Task 5: Test NFS mount by listing files
+    - name: Test NFS mount
+      command: ls -la {{ mount_point }}
+      register: nfs_test
+      changed_when: false
+      
+    # Task 6: Display mount status
+    - name: Display mount status
+      debug:
+        msg: "NFS mount successful. Contents: {{ nfs_test.stdout_lines }}"
+
+# Third play: Verify storage on all nodes
+- name: Verify storage setup
+  hosts: k3s_cluster
+  become: yes
+  
+  tasks:
+    # Task 1: Check if storage is mounted
+    - name: Check storage mount
+      shell: df -h | grep /mnt/storage
+      register: mount_check
+      changed_when: false
+      failed_when: false
+      
+    # Task 2: Display mount info
+    - name: Display storage info
+      debug:
+        msg: "{{ mount_check.stdout }}"
+      when: mount_check.stdout != ""
+      
+    # Task 3: Check disk space
+    - name: Check available space
+      shell: df -h /mnt/storage | tail -1 | awk '{print $4}'
+      register: space_check
+      changed_when: false
+      when: mount_check.stdout != ""
+      
+    # Task 4: Display available space
+    - name: Display available space
+      debug:
+        msg: "Available storage space: {{ space_check.stdout }}"
+      when: 
+        - mount_check.stdout != ""
+        - space_check.stdout is defined

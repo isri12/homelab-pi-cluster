@@ -1,0 +1,86 @@
+---
+- name: Fix cmdline.txt on workers
+  hosts: workers
+  become: yes
+  
+  tasks:
+    - name: Show current cmdline
+      command: cat /boot/firmware/cmdline.txt
+      register: current_cmd
+      changed_when: false
+      
+    - name: Display current cmdline
+      debug:
+        msg: "Current cmdline.txt: {{ current_cmd.stdout }}"
+        
+    - name: Check if cmdline looks corrupted (too short)
+      set_fact:
+        needs_fix: "{{ current_cmd.stdout | length < 100 }}"
+        
+    - name: Restore from .dpkg-dist if available
+      shell: |
+        if [ -f /boot/firmware/cmdline.txt.dpkg-dist ]; then
+          cp /boot/firmware/cmdline.txt.dpkg-dist /boot/firmware/cmdline.txt
+          echo "restored"
+        else
+          echo "not_found"
+        fi
+      register: restore_result
+      when: needs_fix
+      
+    - name: Get master's cmdline for reference
+      command: cat /boot/firmware/cmdline.txt
+      register: master_cmdline
+      delegate_to: pi-master
+      changed_when: false
+      run_once: yes
+      
+    - name: Display master's cmdline
+      debug:
+        msg: "Master cmdline: {{ master_cmdline.stdout }}"
+      run_once: yes
+      
+    - name: Read current cmdline
+      slurp:
+        src: /boot/firmware/cmdline.txt
+      register: cmdline_content
+      
+    - name: Check if cgroup params already present
+      set_fact:
+        has_cgroups: "{{ 'cgroup_enable=memory' in (cmdline_content.content | b64decode) }}"
+        
+    - name: Add cgroup parameters properly
+      shell: |
+        # Read current line
+        CURRENT=$(cat /boot/firmware/cmdline.txt | tr -d '\n')
+        # Remove any existing cgroup params first
+        CLEAN=$(echo "$CURRENT" | sed 's/ *cgroup_enable=[^ ]*//g' | sed 's/ *cgroup_memory=[^ ]*//g')
+        # Add cgroup params at the end
+        echo "$CLEAN cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory" > /boot/firmware/cmdline.txt
+      when: not has_cgroups
+      
+    - name: Show final cmdline
+      command: cat /boot/firmware/cmdline.txt
+      register: final_cmd
+      changed_when: false
+      
+    - name: Display final cmdline
+      debug:
+        msg: "Final cmdline.txt: {{ final_cmd.stdout }}"
+        
+    - name: Reboot workers
+      reboot:
+        reboot_timeout: 300
+        
+    - name: Verify memory cgroup
+      shell: cat /proc/cgroups | grep memory
+      register: cgroup_verify
+      changed_when: false
+      
+    - name: Display result
+      debug:
+        msg: "Memory cgroup: {{ cgroup_verify.stdout }}"
+
+
+# Run it
+# ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/fix-cmdline-workers.yml --ask-vault-pass

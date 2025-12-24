@@ -35,75 +35,64 @@ A complete Kubernetes home lab running on Raspberry Pi cluster with automated de
 
 ## 🎯 Overview
 
-This project provides a complete Infrastructure as Code (IaC) solution for deploying a Kubernetes cluster on Raspberry Pi hardware. It uses:
+Infrastructure as Code (IaC) solution for deploying a Kubernetes cluster on Raspberry Pi hardware. It uses:
 
 - **K3s**: Lightweight Kubernetes distribution optimized for ARM
 - **Ansible**: Automated configuration and cluster deployment
 - **Helm**: Kubernetes package management
 - **NFS**: Shared storage across the cluster
 
-Perfect for learning Kubernetes, DevOps practices, home automation, and self-hosted services.
-
-## 🔧 Hardware Requirements
+## 🔧 Hardware Used
 
 ### Required Hardware
 - **1x Raspberry Pi 4 (4GB RAM)** - Master Node
 - **2x Raspberry Pi 3 Model B (1GB RAM)** - Worker Nodes
-- **3x MicroSD Cards** (32GB+ recommended, Class 10 or better)
-- **1x USB Flash Drive** (64GB+ for shared storage)
-- **3x Power Supplies** (Official Pi power supplies recommended)
-- **1x Network Switch** or router with 3+ Ethernet ports
-- **3x Ethernet Cables** (Cat5e or better)
+- **1x NAS/ or any storage** (64GB+ for shared storage)
+- **1x Network Switch** or router with 3+ Ethernet ports - Optional
+- **3x Ethernet Cables** (Cat5e or better) - Optional 
 
 ### Optional Hardware
 - **Raspberry Pi Cluster Case** (for better organization)
 - **Cooling fans** (recommended for Pi 4)
 - **PoE HATs** (if using PoE switch)
 
-### Your Computer
-- Mac, Linux, or Windows (with WSL2) for running Ansible
+### Computer
+- Linux
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Home Lab Cluster                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌──────────────────┐         ┌────────────────────────┐   │
-│  │   Pi 4 (Master)  │         │   USB Flash Drive      │   │
-│  │   192.168.1.10   │────────▶│   /mnt/storage         │   │
-│  │                  │         │   (NFS Server)         │   │
-│  │  • K3s Control   │         └────────────────────────┘   │
-│  │    Plane         │                                       │
-│  │  • etcd          │                                       │
-│  │  • API Server    │                                       │
-│  │  • Scheduler     │                                       │
-│  └──────────────────┘                                       │
-│           │                                                  │
-│           │ Kubernetes Control                              │
-│           │                                                  │
-│      ┌────┴────────────────┐                               │
-│      │                     │                                │
-│  ┌───▼──────────┐    ┌────▼─────────┐                     │
-│  │ Pi 3 Worker1 │    │ Pi 3 Worker2 │                      │
-│  │ 192.168.1.11 │    │ 192.168.1.12 │                      │
-│  │              │    │              │                       │
-│  │ • App Pods   │    │ • App Pods   │                      │
-│  │ • Monitoring │    │ • Monitoring │                      │
-│  └──────────────┘    └──────────────┘                      │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+<details>
+<summary>Click to view Cluster Architecture</summary>
 
-Network: 
-Storage: NFS from Pi 4 (Future: Pi 5 NAS)
+```mermaid
+graph TD
+    subgraph cluster["Home Lab Cluster"]
+        master["<b>Pi 4 (Master)</b><br/>192.168.X.XX<br/><br/>• K3s Control Plane<br/>• etcd<br/>• API Server<br/>• Scheduler"]
+        
+        storage["<b>Storage: USB Flash Drive</b><br/>/mnt/storage<br/>(NFS Server)<br/><br/>Network:<br/>(FOR Future: Pi 5 NAS)"]
+        
+        worker1["<b>Pi 3 Worker1</b><br/>192.168.X.XX<br/><br/>• App Pods<br/>• Monitoring"]
+        
+        worker2["<b>Pi 3 Worker2</b><br/>192.168.X.XX<br/><br/>• App Pods<br/>• Monitoring"]
+        
+        master -->|Mount| storage
+        master -->|Kubernetes Control| worker1
+        master -->|Kubernetes Control| worker2
+    end
+    
+    style master fill:#e1f5ff,stroke:#01579b,stroke-width:2px,color:#000
+    style storage fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000
+    style worker1 fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000
+    style worker2 fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000
+    style cluster fill:#fafafa,stroke:#333,stroke-width:3px,color:#000
 ```
+</details>
 
 ### Storage Architecture
 
 **Current (Phase 1):**
 ```
-Pi 4 + USB Drive → NFS Server → Workers mount NFS
+Pi 4 Master + USB Drive → NFS Server → Workers mount NFS
 ```
 
 **Future (Phase 2):**
@@ -127,36 +116,10 @@ Pi 5 NAS (Independent) → NFS/iSCSI → All cluster nodes
 
 ## 📦 Prerequisites
 
-### On Your Computer
-
-#### macOS
-```bash
-# Install Homebrew (if not already installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install required tools
-brew install ansible git
-brew install --cask raspberry-pi-imager visual-studio-code
-```
-
 #### Ubuntu/Debian Linux
 ```bash
 sudo apt update
 sudo apt install -y ansible git
-sudo apt install rpi-imager  # Or download from raspberrypi.com
-```
-
-#### Windows (WSL2)
-```powershell
-# Install WSL2 first
-wsl --install
-
-# Then inside WSL2:
-sudo apt update
-sudo apt install -y ansible git
-
-# Download Raspberry Pi Imager for Windows from:
-# https://www.raspberrypi.com/software/
 ```
 
 ### Software Versions
@@ -169,69 +132,78 @@ sudo apt install -y ansible git
 
 ### 1. Clone This Repository
 ```bash
-git clone https://github.com/yourusername/homelab-pi-cluster.git
+git clone https://github.com/isri12/homelab-pi-cluster.git
 cd homelab-pi-cluster
 ```
 
-### 2. Flash SD Cards
+### 2. Flash SD Cards and install ubuntu server LTS
 Use Raspberry Pi Imager to flash all 3 SD cards with:
-- **OS**: Raspberry Pi OS Lite (64-bit)
+- **OS**: ubuntu server LTS (64-bit)
 - **SSH**: Enabled
-- **Username**: pi
+- **Username**: pi (TEMPORARY)
 - **Password**: [your-password]
 - **Hostname**: raspberrypi (will be changed by Ansible)
 
 ### 3. Configure Your Inventory
+
 ```bash
 # Edit with your Pi IP addresses
 nano ansible/inventory/hosts.yml
 ```
 
-Update the IP addresses for your Pis:
-```yaml
-master:
-  hosts:
-    pi-master:
-      ansible_host: 192.168.1.10  # ← YOUR Pi 4 IP
-      node_ip: 192.168.1.10
-      
-workers:
-  hosts:
-    pi-worker1:
-      ansible_host: 192.168.1.11  # ← YOUR Pi 3 #1 IP
-      node_ip: 192.168.1.11
-    pi-worker2:
-      ansible_host: 192.168.1.12  # ← YOUR Pi 3 #2 IP
-      node_ip: 192.168.1.12
-```
-Create  ansible pass
-
-```
+Create  ansible password cred. 
+```bash
 ansible-vault creates ansible/inventory/group_vars/all/vault.yml
 ```
 
 view
-```
+```bash
 ansible-vault view ansible/inventory/group_vars/all/vault.yml
 ```
 
 edit
-```
+```bash
 ansible-vault edit ansible/inventory/group_vars/all/vault.yml
+```
 
-```
 test
-```
+```bash
 ansible all -i ansible/inventory/hosts.yml -m ping --ask-vault-pass
 ```
-prepare pi
-```
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml --ask-vault-pass
-```
+
 ### 4. Test Ansible Connection
 ```bash
-ansible all -i ansible/inventory/hosts.yml -m ping
+ansible all -i ansible/inventory/hosts.yml -m ping --ask-vault-pass
 ```
+
+errors with run with sudo for all nodes
+``` bash
+echo '$ROOT_USER ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/010_isri-nopasswd
+sudo chmod 0440 /etc/sudoers.d/010_ROOT_USER-nopasswd
+sudo whoami 
+```
+
+cgroup Issue
+
+```bash
+ssh isri@10.0.0.156
+
+# Check what the master has
+ssh isri@10.0.0.155 "cat /boot/firmware/cmdline.txt"
+
+# On worker, create a proper cmdline.txt
+# Replace the content with a typical Raspberry Pi boot line + cgroups
+sudo nano /boot/firmware/cmdline.txt
+```
+
+A typical cmdline.txt should look like this (all on ONE line):
+```bash
+console=serial0,115200 console=tty1 root=PARTUUID=xxxxxxxx-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=MD cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory
+
+```
+
+
+
 
 ### 5. Run Automated Setup
 ```bash
@@ -239,7 +211,9 @@ ansible all -i ansible/inventory/hosts.yml -m ping
 ./scripts/setup-cluster.sh
 
 # Or run playbooks individually:
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml
+# ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml
+
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml --ask-vault-pass
 ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/02-install-k3s.yml
 ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-storage.yml
 ```
