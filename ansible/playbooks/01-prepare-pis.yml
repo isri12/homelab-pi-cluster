@@ -1,6 +1,8 @@
 ---
 # This playbook prepares all Raspberry Pis for Kubernetes (k3s) installation
 # It updates the system, installs dependencies, configures cgroups, and disables swap
+# ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml --ask-vault-pass
+
 
 # First play: Configure all Raspberry Pis
 - name: Prepare all Raspberry Pis
@@ -60,16 +62,38 @@
     # Task 6: Enable cgroups (control groups) - required for Kubernetes
     # cgroups limit CPU and memory usage for containers
     - name: Enable cgroups for Kubernetes
-      lineinfile:
-        # Edit the boot configuration file
-        path: /boot/firmware/cmdline.txt
-        # Use regex to find the line ending with "rootwait"
-        backrefs: yes
-        regexp: '^(.*rootwait.*)$'
-        # Add cgroup options to enable memory and CPU limits
-        line: '\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
-      # Save result to check if changes were made
+      shell: |
+        # 1. Identify the active cmdline file by checking config.txt
+        CMDLINE_FILE="/boot/firmware/cmdline.txt"
+        if [ -f /boot/firmware/config.txt ]; then
+            OVERRIDE=$(grep "cmdline=" /boot/firmware/config.txt | tail -1 | cut -d= -f2 | xargs)
+            if [ ! -z "$OVERRIDE" ]; then
+                CMDLINE_FILE="/boot/firmware/$OVERRIDE"
+            fi
+        fi
+        
+        # 2. Read current content
+        CURRENT=$(cat "$CMDLINE_FILE" | tr -d '\n')
+        
+        # Check if already enabled
+        if echo "$CURRENT" | grep -q "cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory swapaccount=1" && ! echo "$CURRENT" | grep -q "cgroup_disable=memory"; then
+            echo "no_change"
+            exit 0
+        fi
+        # Remove any partial/existing cgroup params to avoid duplicates and append fresh ones
+        CLEAN=$(echo "$CURRENT" | sed 's/ *cgroup_enable=[^ ]*//g' | sed 's/ *cgroup_memory=[^ ]*//g' | sed 's/ *cgroup_disable=[^ ]*//g' | sed 's/ *swapaccount=[^ ]*//g')
+        echo -n "$CLEAN cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory swapaccount=1" > "$CMDLINE_FILE"
+        
+        # Also clean up any other files that might have the disable flag (like nobtcmd.txt)
+        grep -l "cgroup_disable=memory" /boot/firmware/*.txt 2>/dev/null | while read file; do
+          if [ "$file" != "$CMDLINE_FILE" ]; then
+            sed -i 's/ *cgroup_disable=memory//g' "$file"
+          fi
+        done
+        
+        echo "changed"
       register: cmdline_result
+      changed_when: "'changed' in cmdline_result.stdout"
       
     # Task 7: Disable swap memory
     # Kubernetes works better without swap, so we disable it
