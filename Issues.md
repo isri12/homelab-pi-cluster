@@ -542,7 +542,6 @@ After switching kernels:
 * Worker kernel **lacks memory cgroups**
 * Master kernel **has them**
 * Kubernetes needs **uniform support**
-* **Install `linux-generic` on all nodes** → problem solved permanently
 
 ---
 
@@ -700,14 +699,13 @@ choosing Work 1 and Work 2
 Raspberry pi Model 3 B+ 
 Raspberry Pi OS Lite  
 
-
-
 https://valentevidal.medium.com/crafting-a-local-kubernetes-cluster-using-k3s-and-raspberry-pies-a65905bbaca6
-#1
-isri@worker-pi-1:~ $ cat /boot/firmware/cmdline.txt
+
+#1 Modify /boot/cmdline.txtand add cgroup_memory=1 cgroup_enable=memory
+$ cat /boot/firmware/cmdline.txt
 console=serial0,115200 console=tty1 root=PARTUUID=4967eadf-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=GB
-#2
-arm_64bit=1 at the end of the file /boot/firmware/config.txt
+
+#2 add arm_64bit=1 at the end of the file /boot/firmware/config.txt
 /boot/firmware/config.txt
 
 [all]
@@ -726,15 +724,12 @@ Get the Master IP:
 hostname -I | awk '{print $1}'
 
 K3S_URL=https://10.0.0.154:6443 
-K3S_TOKEN=K10231dddbbca12c50083422a9922c770fbe008008cf18fdf84db54c7845340bc45::server:f2720e3ef3d1688de578d0852025b62c
-
+K3S_TOKEN=
 
 
 Worker 1 &2
 curl -sfL https://get.k3s.io | K3S_URL=https://<MASTER_IP>:6443 K3S_TOKEN=<NODE_TOKEN> sh -
 
-
-curl -sfL https://get.k3s.io | K3S_URL=https://10.0.0.154:6443 :6443 K3S_TOKEN=K10231dddbbca12c50083422a9922c770fbe008008cf18fdf84db54c7845340bc45::server:f2720e3ef3d1688de578d0852025b62c sh -
 
 --------------
 
@@ -776,3 +771,20 @@ sudo kubectl run dns-test --image=busybox:1.28 --rm -it -- restart=Never -- nslo
 
 Check for "Taints" and "Labels":
 sudo kubectl get nodes --show-labels
+
+--
+sudo kubectl drain worker-pi-1 --ignore-daemonsets --delete-emptydir-data
+# On Master
+sudo systemctl stop k3s
+sudo systemctl restart k3s
+On Worker: 
+# On Worker: Stop the agent service
+sudo systemctl stop k3s-agent
+sudo systemctl restart k3s-agent
+sudo reboot
+
+# Remove stale nodes
+sudo kubectl delete node rpimaster worker-pi-1
+
+# Uncordon pi-worker1 (it is marked as SchedulingDisabled)
+sudo kubectl uncordon pi-worker1

@@ -11,6 +11,7 @@ echo ""
 # Configuration
 VAULT_PASS_FILE="${HOME}/.vault_pass"
 INVENTORY="ansible/inventory/hosts.yml"
+MASTER_IP="10.0.0.155" # Replace with your actual master node IP
 
 # Check if vault password file exists
 if [ ! -f "$VAULT_PASS_FILE" ]; then
@@ -28,6 +29,12 @@ if [ ! -f "$VAULT_PASS_FILE" ]; then
 else
     echo "✅ Using vault password file: $VAULT_PASS_FILE"
     VAULT_ARGS="--vault-password-file $VAULT_PASS_FILE"
+fi
+
+# Check for Ansible
+if ! command -v ansible-playbook &> /dev/null; then
+    echo "❌ Ansible is not installed. Please install it first: sudo apt install ansible"
+    exit 1
 fi
 
 echo ""
@@ -73,9 +80,19 @@ echo "=================================================="
 echo "⚙️  Step 4/7: Configuring kubectl"
 echo "=================================================="
 mkdir -p ~/.kube
-cp kubeconfig ~/.kube/config 2>/dev/null || echo "⚠️  Kubeconfig not found, will be created by K3s playbook"
+
+if [ -f "kubeconfig" ]; then
+    cp kubeconfig ~/.kube/config
+elif [ -f "/etc/rancher/k3s/k3s.yaml" ]; then
+    echo "ℹ️  Copying kubeconfig from system location..."
+    sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+    sudo chown $(id -u):$(id -g) ~/.kube/config
+else
+    echo "⚠️  Kubeconfig not found, will be created by K3s playbook"
+fi
+
 # Update server IP to master node IP
-sed -i 's/127.0.0.1/10.0.0.155/g' ~/.kube/config 2>/dev/null || true
+sed -i "s/127.0.0.1/${MASTER_IP}/g" ~/.kube/config 2>/dev/null || true
 echo "✅ Kubeconfig configured"
 
 echo ""
@@ -120,7 +137,8 @@ echo "Adding Helm repositories..."
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
 helm repo add grafana https://grafana.github.io/helm-charts 2>/dev/null || true
 helm repo add mojo2600 https://mojo2600.github.io/pihole-kubernetes/ 2>/dev/null || true
-helm repo add k8s-at-home https://k8s-at-home.com/charts/ 2>/dev/null || true
+# Note: k8s-at-home is deprecated. Using the archive URL for stability. 
+helm repo add k8s-at-home https://k8s-at-home.github.io/charts/ 2>/dev/null || true
 helm repo update
 
 echo ""
@@ -180,7 +198,7 @@ echo "🌐 Access Your Services:"
 echo "========================"
 echo ""
 echo "  📊 Grafana:"
-echo "     URL: http://10.0.0.155:30080"
+echo "     URL: http://${MASTER_IP}:30080"
 echo "     Username: admin"
 echo "     Password: (check helm-values/prometheus-stack-values.yaml)"
 echo ""

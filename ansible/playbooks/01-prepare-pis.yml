@@ -95,6 +95,15 @@
       register: cmdline_result
       changed_when: "'changed' in cmdline_result.stdout"
       
+    # Task 6b: Enable 64-bit kernel in config.txt
+    - name: Enable 64-bit kernel
+      lineinfile:
+        path: /boot/firmware/config.txt
+        regexp: '^arm_64bit='
+        line: 'arm_64bit=1'
+        insertafter: '\[all\]'
+      register: config_result
+
     # Task 7: Disable swap memory
     # Kubernetes works better without swap, so we disable it
     - name: Disable swap
@@ -114,7 +123,7 @@
         # Wait up to 5 minutes (300 seconds) for reboot to complete
         reboot_timeout: 300
       # Only reboot if the cmdline.txt file was modified in Task 6
-      when: cmdline_result.changed
+      when: cmdline_result.changed or config_result.changed
       
     # Task 9: Wait for the system to come back online after reboot
     - name: Wait for system to come back online
@@ -124,7 +133,7 @@
         # Stop trying after 5 minutes (300 seconds)
         timeout: 300
       # Only wait if the system was rebooted in Task 8
-      when: cmdline_result.changed
+      when: cmdline_result.changed or config_result.changed
 
 # Second play: Verify that all preparations completed successfully
 - name: Verify preparation
