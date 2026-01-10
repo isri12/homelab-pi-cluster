@@ -190,8 +190,8 @@ ansible all -i ansible/inventory/hosts.yml -m ping --ask-vault-pass
 # ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml
 
 ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml --ask-vault-pass
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/02-install-k3s.yml
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-storage.yml
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/02-install-k3s.yml --ask-vault-pass
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-storage.yml --ask-vault-pass
 ```
 reboot workers
 ```bash

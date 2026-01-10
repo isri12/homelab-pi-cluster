@@ -1,6 +1,7 @@
 ---
 # This playbook sets up USB storage on the master node and configures NFS
 # for shared storage across the Kubernetes cluster
+# ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-storage.yml --ask-vault-pass
 
 # Configuration variables
 # These can be overridden when running the playbook
@@ -62,6 +63,7 @@
         fstype: ext4
         dev: "{{ usb_device }}"
         opts: -L k8s-storage  # Label the filesystem
+        force: yes
       when: 
         - usb_check.stat.exists
         - existing_fs.stdout != "ext4"

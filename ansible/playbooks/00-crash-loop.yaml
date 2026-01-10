@@ -1,0 +1,16 @@
+# CKA Practice: Troubleshooting
+# Task: Apply this file, realize the pod is crashing, and fix it.
+# Command: kubectl apply -f 01-crash-loop.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cka-troubleshoot-1
+  labels:
+    app: practice
+spec:
+  containers:
+  - name: busybox
+    image: busybox
+    # HINT: busybox exits immediately if it has no command to run
+    command: ["sh", "-c", "echo 'I am running'; exit 1"]
