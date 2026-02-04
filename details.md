@@ -402,6 +402,29 @@ deployment.apps/nfs-client-provisioner condition met
 kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
 
 ./scripts/deploy-with-docker.sh
+
+What will happen:
+Creates namespaces (pihole, home, n8n, monitoring)
+Deploys Pi-hole with PVC
+Deploys Home Assistant with PVC
+Deploys N8n with PVC
+Deploys Prometheus with PVC
+Deploys Grafana with PVC
+
+# Watch all pods
+watch -n 2 'kubectl get pods -A'
+
+# Or check each namespace
+kubectl get pods -n pihole -w
+kubectl get pods -n home -w
+kubectl get pods -n n8n -w
+kubectl get pods -n monitoring -w
+
+# Watch persistent volume claims being created
+watch kubectl get pvc -A
+
+ 
+ 
  or 
  manually
 
@@ -856,6 +879,45 @@ kubectl get pods -n metallb-system
 ssh pi@192.168.1.10
 curl http://192.168.1.100  # Pi-hole
 ```
+
+echo "======================================================================"
+echo "🏠 Home Lab Access Information"
+echo "======================================================================"
+echo ""
+echo "🛡️  Pi-hole (Ad Blocking):"
+echo "   URL:      http://10.0.0.100/admin"
+echo "   Password: changeme123"
+echo ""
+echo "🏠 Home Assistant:"
+echo "   URL:      http://10.0.0.101:8123"
+echo "   Note:     First-time setup wizard"
+echo ""
+echo "⚡ N8n (Automation):"
+echo "   URL:      http://10.0.0.102:5678"
+echo "   Username: admin"
+echo "   Password: changeme123"
+echo ""
+echo "📊 Prometheus (Metrics):"
+echo "   URL:      http://10.0.0.154:30090"
+echo "   Note:     No login required"
+echo ""
+echo "📈 Grafana (Dashboards):"
+echo "   URL:      http://10.0.0.154:30080"
+echo "   Username: admin"
+echo "   Password: changeme123"
+echo ""
+echo "======================================================================"
+echo "⚠️  SECURITY: Change all default passwords!"
+echo "======================================================================"
+
+🌐 Access Your Services:
+========================
+
+     Pi-hole:         http://10.0.0.100/admin (password: changeme123)
+  🏠 Home Assistant:  http://10.0.0.101:8123
+  ⚡ N8n:             http://10.0.0.102:5678 (admin/changeme123)
+  📊 Prometheus:      http://10.0.0.154:30090
+  📈 Grafana:         http://10.0.0.154:30080 (admin/changeme123)
 
 ### Performance Issues
 
