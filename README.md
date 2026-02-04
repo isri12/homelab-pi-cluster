@@ -2,7 +2,11 @@
 
 Welcome to the Home Lab Raspberry Pi Cluster project! This repository contains the Infrastructure as Code (IaC) to deploy and manage a Kubernetes cluster on Raspberry Pi hardware using K3s and Ansible.
 
-## 📂 Documentation
+Kubernetes (K3s), Ansible, Helm, Docker/containerd, Prometheus, Grafana, GitOps, Bash Scripting. 
+Systems & Networking: Linux (Ubuntu), NFS Storage, TCP/IP, DNS (Pi-hole), Load Balancing (MetalLB), Kernel Configuration (cgroups).
+
+
+## Documentation
 
 Please refer to the following documents for detailed information:
 
@@ -13,7 +17,7 @@ Please refer to the following documents for detailed information:
 *   **[Helpful Commands](helpful_commands.md)**
     *   A cheat sheet for useful system and Kubernetes commands.
 
-## 🚀 Project Overview
+## Project Overview
 
 This project automates the deployment of a lightweight Kubernetes cluster optimized for ARM hardware. It transforms a set of Raspberry Pis into a production-ready home lab capable of running essential self-hosted services.
 
@@ -23,13 +27,13 @@ This project automates the deployment of a lightweight Kubernetes cluster optimi
 *   **GitOps Ready**: Infrastructure defined as code.
 *   **Shared Storage**: NFS provisioning for persistent data.
 
-## 🏗️ Architecture & Hardware
+##  Architecture & Hardware
 
 *   **Master Node**: Raspberry Pi 4 (4GB RAM) - Runs Control Plane & API Server.
 *   **Worker Nodes**: 2x Raspberry Pi 3 Model B+ - Runs Application Workloads.
 *   **Storage**: USB Drive via NFS (Future: Pi 5 NAS).
 
-### 🔌 Network Topology
+###  Network Topology
 
 ```mermaid
 graph TD
@@ -55,14 +59,14 @@ graph TD
     Laptop -.->|SSH / Ansible| Worker2
 ```
 
-## 📦 Services Running
+##  Services Running
 
 *   **Pi-hole**: Network-wide ad blocking and DNS.
 *   **Home Assistant**: Home automation hub.
 *   **N8n**: Workflow automation.
 *   **Monitoring Stack**: Grafana & Prometheus for cluster metrics.
 
-## ⚡ Quick Start Summary
+##  Quick Start Summary
 
 1.  **Flash OS**: Install Ubuntu Server (Master) and Raspberry Pi OS Lite (Workers).
 2.  **Configure**: Update `ansible/inventory/hosts.yml` with your IPs.

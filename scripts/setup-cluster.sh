@@ -11,7 +11,7 @@ echo ""
 # Configuration
 VAULT_PASS_FILE="${HOME}/.vault_pass"
 INVENTORY="ansible/inventory/hosts.yml"
-MASTER_IP="10.0.0.155" # Replace with your actual master node IP
+MASTER_IP="10.0.0.154" # Replace with your actual master node IP
 
 # Check if vault password file exists
 if [ ! -f "$VAULT_PASS_FILE" ]; then

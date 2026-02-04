@@ -1,5 +1,12 @@
 # Home Lab Raspberry Pi Cluster
 
+Architected and deployed a multi-node Kubernetes (K3s) cluster on ARM64 hardware using Ansible for automated infrastructure provisioning and configuration management.
+Implemented Infrastructure as Code (IaC) principles to manage OS hardening, cgroup kernel tuning, and software installation across Ubuntu and Raspberry Pi OS nodes.
+Configured shared persistent storage using NFS with dynamic volume provisioning for stateful workloads.
+Deployed a full monitoring stack using Helm (Prometheus & Grafana) to visualize cluster metrics and hardware resource usage.
+Diagnosed and resolved complex Linux kernel compatibility issues regarding cgroup v2 memory controllers on embedded hardware
+
+
 Kubernetes cluster running on:
 - 1x Pi 4 (Master)
 - 2x Pi 3 b+ (Workers)
@@ -210,19 +217,11 @@ After deployment completes:
 
 ### Step 1: Flash Raspberry Pi OS
 
-1. **Download Raspberry Pi Imager**: https://www.raspberrypi.com/software/
+1. **Download Raspberry Pi Imager**
+  - Ubuntu LTS 
 
 2. **For each SD card:**
-   - Insert SD card into your computer
-   - Open Raspberry Pi Imager
-   - Choose OS → Raspberry Pi OS (other) → **Raspberry Pi OS Lite (64-bit)**
-   - Choose Storage → Your SD card
-   - Click Settings (⚙️ icon):
-     - ✅ Enable SSH (password authentication)
-     - ✅ Set username: `pi`, password: [your-choice]
-     - ✅ Configure WiFi (optional)
-     - ✅ Set locale: Your timezone and keyboard
-   - Write and wait for completion
+
    - Label cards: "Master", "Worker1", "Worker2"
 
 3. **Insert SD cards and power on Pis**
@@ -302,6 +301,55 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-stora
 - Mounts NFS on workers
 - Creates storage directories
 
+
+
+### To update your K3s configuration to use your custom storage 
+/etc/systemd/system/k3s.service
+
+```bash
+ExecStart=/usr/local/bin/k3s \
+    server \
+    --write-kubeconfig-mode 644 \
+    --default-local-storage-path /mnt/storage
+```
+
+What these flags do:
+--write-kubeconfig-mode 644: This fixes the "permission denied" error you saw at the beginning. It allows your user (isri) to run kubectl commands without using sudo.
+--default-local-storage-path /mnt/storage: This tells K3s that whenever an app (like Prometheus or Pi-hole) asks for "Local Storage," it should create the folders inside your /mnt/storage directory instead of the default system path.
+
+
+# 1. Reload the systemd manager to notice the file change
+sudo systemctl daemon-reload
+
+# 2. Restart K3s
+sudo systemctl restart k3s
+
+# 3. Verify the status
+sudo systemctl status k3s
+
+### NFS Server Setup
+Step 1: Configure NFS Server (Run on pi-master)
+Install the NFS Server:
+```bash
+sudo apt update && sudo apt install nfs-kernel-server -y
+Use code with caution.
+```
+Export your directory:
+Open /etc/exports and add this line to share your storage with your cluster network:
+bash
+```
+/mnt/storage *(rw,sync,no_subtree_check,no_root_squash)
+```
+Use code with caution.
+
+(Note: * allows all IPs. For better security, replace * with your cluster subnet like 192.168.1.0/24).
+Apply changes:
+bash
+sudo exportfs -a
+sudo systemctl restart nfs-kernel-server
+Use code with caution.
+
+
 ### Step 6: Deploy Kubernetes Services
 
 #### Install Helm
@@ -313,12 +361,28 @@ curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo add grafana https://grafana.github.io/helm-charts
-helm repo add mojo2600 https://mojo2600.github.io/pihole-kubernetes/
-helm repo add k8s-at-home https://k8s-at-home.com/charts/
+helm repo add mojo2600 https://mojo2600.github.io
+helm repo add bjw-s https://bjw-s-labs.github.io/helm-charts
+helm repo add pajikos http://pajikos.github.io/home-assistant-helm-chart/
 helm repo update
 ```
 
+On MAster NODE
+```bash
+cd ~
+git clone https://github.com/isri12/homelab-pi-cluster.git
+
+cd homelab-pi-cluster
+
+kubectl apply -f kubernetes/storage/nfs-provisioner.yaml
+```
 #### Deploy NFS Provisioner
+Before deploying apps that need storage, make sure the provisioner is actually running:
+```bash
+kubectl get pods -n nfs-provisioner
+```
+
+
 ```bash
 kubectl apply -f kubernetes/storage/nfs-provisioner.yaml
 kubectl wait --for=condition=available --timeout=300s \
@@ -367,7 +431,31 @@ kubectl get pvc --all-namespaces
 
 # Check services
 kubectl get svc --all-namespaces
+
+# Check all nodes
+kubectl get nodes -o wide
+
+# Check all namespaces
+kubectl get namespaces
+
+# Check all pods across all namespaces
+kubectl get pods -A
+
+# Check pod status in each namespace
+kubectl get pods -n pihole
+kubectl get pods -n home
+kubectl get pods -n n8n
+kubectl get pods -n monitoring
+
+
+# Verify it's running
+kubectl get pods -n nfs-provisioner
+kubectl get storageclass
 ```
+
+
+
+
 
 ## 📁 Project Structure
 
