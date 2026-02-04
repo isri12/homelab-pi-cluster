@@ -388,6 +388,22 @@ kubectl apply -f kubernetes/storage/nfs-provisioner.yaml
 kubectl wait --for=condition=available --timeout=300s \
   deployment/nfs-client-provisioner -n nfs-provisioner
 ```
+isri@pi-master:~/homelab-pi-cluster$ kubectl get pods -n nfs-provisioner
+NAME                                      READY   STATUS    RESTARTS   AGE
+nfs-client-provisioner-65f7577f5b-94mnt   1/1     Running   0          2m12s
+isri@pi-master:~/homelab-pi-cluster$ kubectl get storageclass
+NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+local-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  30d
+nfs-client (default)   nfs-storage             Delete          Immediate              false                  3m13s
+isri@pi-master:~/homelab-pi-cluster$ kubectl wait --for=condition=available --timeout=300s deployment/nfs-client-provisioner -n nfs-provisioner
+deployment.apps/nfs-client-provisioner condition met
+
+# Remove default annotation from local-path
+kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+
+./scripts/deploy-with-docker.sh
+ or 
+ manually
 
 #### Deploy Monitoring Stack
 ```bash
