@@ -919,6 +919,61 @@ echo "======================================================================"
   📊 Prometheus:      http://10.0.0.154:30090
   📈 Grafana:         http://10.0.0.154:30080 (admin/changeme123)
 
+
+# SSH to master
+ssh isri@10.0.0.154
+
+# Get the Pi-hole pod name
+kubectl get pods -n pihole
+
+# Execute into the container
+kubectl exec -it -n pihole pihole-xxxxxxxxxx-xxxxx -- /bin/bash
+
+# Change password
+pihole -a -p
+
+# Exit
+exit
+
+# Test Pi-hole
+curl http://10.0.0.100/admin | head -20
+
+# Test Home Assistant
+curl http://10.0.0.101:8123
+
+# Test N8n
+curl http://10.0.0.102:5678
+
+# Test Prometheus
+curl http://10.0.0.154:30090
+
+# Test Grafana
+curl http://10.0.0.154:30080
+
+🖥️ From Your Browser
+Simply open these URLs in your browser:
+
+Pi-hole: http://10.0.0.100/admin
+Home Assistant: http://10.0.0.101:8123
+N8n: http://10.0.0.102:5678
+Prometheus: http://10.0.0.154:30090
+Grafana: http://10.0.0.154:30080
+
+📱 Bonus: Setup Grafana Data Source
+After logging into Grafana:
+
+Click "Connections" → "Data sources"
+Click "Add data source"
+Select "Prometheus"
+Set URL to: http://prometheus.monitoring.svc.cluster.local:9090
+Click "Save & Test"
+
+Now you can create dashboards showing your cluster metrics!
+🎯 Summary Table
+ServiceURLUsernamePasswordNotesPi-holehttp://10.0.0.100/admin-changeme123Password onlyHome Assistanthttp://10.0.0.101:8123(create)(create)First-time setupN8nhttp://10.0.0.102:5678adminchangeme123Basic authPrometheushttp://10.0.0.154:30090--No authGrafanahttp://10.0.0.154:30080adminchangeme123Web login
+All passwords are changeme123 - please change them! 🔒
+Try accessing them now! Let me know if any don't work. 🚀
+
 ### Performance Issues
 
 **Problem**: Cluster is slow
