@@ -790,6 +790,7 @@ N8n:        http://10.0.0.102:5678 (admin/changeme123)
 Prometheus: http://10.0.0.154:30090
 Grafana:    http://10.0.0.154:30080 (admin/changeme123)
 ```
-
+# Get detailed information about why it's pending
+kubectl describe pod home-assistant-88d7c44db-dvxjm -n home
 ---
 

@@ -1,31 +1,11 @@
-# Home Lab Raspberry Pi Cluster
+# 🏠 Home Lab Raspberry Pi Cluster
 
-Architected and deployed a multi-node Kubernetes (K3s) cluster on ARM64 hardware using Ansible for automated infrastructure provisioning and configuration management.
-Implemented Infrastructure as Code (IaC) principles to manage OS hardening, cgroup kernel tuning, and software installation across Ubuntu and Raspberry Pi OS nodes.
-Configured shared persistent storage using NFS with dynamic volume provisioning for stateful workloads.
-Deployed a full monitoring stack using Helm (Prometheus & Grafana) to visualize cluster metrics and hardware resource usage.
-Diagnosed and resolved complex Linux kernel compatibility issues regarding cgroup v2 memory controllers on embedded hardware
-
-
-Kubernetes cluster running on:
-- 1x Pi 4 (Master)
-- 2x Pi 3 b+ (Workers)
-
-## Services
-- Pi-hole
-- Home Assistant
-- N8n
-- Grafana/Prometheus
-
-
-# Home Lab Raspberry Pi Cluster
-
-A complete Kubernetes home lab running on Raspberry Pi cluster with automated deployment using Ansible and Helm.
+A complete Infrastructure as Code (IaC) solution for deploying a Kubernetes cluster on Raspberry Pi hardware with automated setup via Ansible and Helm.
 
 ## 📋 Table of Contents
 
 - [Overview](#overview)
-- [Hardware Requirements](#hardware-requirements)
+- [Hardware](#hardware)
 - [Architecture](#architecture)
 - [Services](#services)
 - [Prerequisites](#prerequisites)
@@ -38,47 +18,58 @@ A complete Kubernetes home lab running on Raspberry Pi cluster with automated de
 - [Maintenance](#maintenance)
 - [Troubleshooting](#troubleshooting)
 - [Future Upgrades](#future-upgrades)
-- [Contributing](#contributing)
+
+---
 
 ## 🎯 Overview
 
-Infrastructure as Code (IaC) solution for deploying a Kubernetes cluster on Raspberry Pi hardware. It uses:
+This project deploys a Kubernetes cluster on Raspberry Pi hardware using:
 
-- **K3s**: Lightweight Kubernetes distribution optimized for ARM
+- **K3s**: Lightweight Kubernetes distribution optimized for ARM64
 - **Ansible**: Automated configuration and cluster deployment
 - **Helm**: Kubernetes package management
-- **NFS**: Shared storage across the cluster
+- **NFS**: Shared persistent storage across the cluster
 
-## 🔧 Hardware Used
+**Key Features:**
+- Automated infrastructure provisioning with Ansible
+- OS hardening and kernel tuning for embedded hardware
+- Dynamic volume provisioning for stateful workloads
+- Complete monitoring stack (Prometheus & Grafana)
+- Network-wide services (Pi-hole, Home Assistant, N8n)
 
-### Required Hardware
-- **1x Raspberry Pi 4 (4GB RAM)** - Master Node
-   - Ubuntu LTS (64-bit)
-- **2x Raspberry Pi 3 Model B (500M RAM)** - Worker Nodes
-  - Raspberry Pi OS Lite (64-BIT)
-- **1x NAS/ or any storage** (64GB+ for shared storage)
-- **1x Network Switch** or router with 3+ Ethernet ports - Optional
-- **3x Ethernet Cables** (Cat5e or better) - Optional 
+---
+
+## 🔧 Hardware
+
+### Cluster Composition
+
+| Component | Specification | OS |
+|-----------|---------------|-----|
+| **Master Node** | 1x Raspberry Pi 4 (4GB RAM) | Ubuntu LTS (64-bit) |
+| **Worker Nodes** | 2x Raspberry Pi 3 Model B (512MB RAM) | Raspberry Pi OS Lite (64-bit) |
+| **Storage** | USB Flash Drive (64GB+) / Future: Pi 5 NAS | N/A |
+| **Network** | Ethernet switch or router (3+ ports) | N/A |
 
 ### Optional Hardware
-- **Raspberry Pi Cluster Case** (for better organization)
-- **Cooling fans** (recommended for Pi 4)
-- **PoE HATs** (if using PoE switch)
 
-### Computer
-- Linux
+- Raspberry Pi cluster case
+- Cooling fans (recommended for Pi 4)
+- PoE HATs (for PoE switch)
+- Ethernet cables (Cat5e or better)
+
+---
 
 ## 🏗️ Architecture
 
 <details>
-<summary>Click to view Cluster Architecture</summary>
+<summary>📊 Cluster Architecture Diagram</summary>
 
 ```mermaid
 graph TD
     subgraph cluster["Home Lab Cluster"]
         master["<b>Pi 4 (Master)</b><br/>192.168.X.XX<br/><br/>• K3s Control Plane<br/>• etcd<br/>• API Server<br/>• Scheduler"]
         
-        storage["<b>Storage: USB Flash Drive</b><br/>/mnt/storage<br/>(NFS Server)<br/><br/>Network:<br/>(FOR Future: Pi 5 NAS)"]
+        storage["<b>Storage: USB Flash Drive</b><br/>/mnt/storage<br/>(NFS Server)<br/><br/>Network:<br/>(Future: Pi 5 NAS)"]
         
         worker1["<b>Pi 3 Worker1</b><br/>192.168.X.XX<br/><br/>• App Pods<br/>• Monitoring"]
         
@@ -109,169 +100,184 @@ Pi 4 Master + USB Drive → NFS Server → Workers mount NFS
 Pi 5 NAS (Independent) → NFS/iSCSI → All cluster nodes
 ```
 
+---
+
 ## 🚀 Services
 
-### Core Services
-- **Pi-hole** - Network-wide ad blocking and DNS server
-- **Home Assistant** - Home automation platform
-- **N8n** - Workflow automation (IFTTT alternative)
-- **Grafana** - Metrics visualization and dashboards
-- **Prometheus** - Metrics collection and monitoring
+### Core Applications
+
+| Service | Purpose | Access |
+|---------|---------|--------|
+| **Pi-hole** | Network-wide ad blocking & DNS | http://10.0.0.100/admin |
+| **Home Assistant** | Home automation platform | http://10.0.0.101:8123 |
+| **N8n** | Workflow automation (IFTTT alternative) | http://10.0.0.102:5678 |
+| **Prometheus** | Metrics collection & storage | http://10.0.0.154:30090 |
+| **Grafana** | Metrics visualization & dashboards | http://10.0.0.154:30080 |
 
 ### System Services
-- **K3s** - Lightweight Kubernetes
-- **NFS Provisioner** - Dynamic persistent volume provisioning
-- **MetalLB** (optional) - Load balancer for bare metal
+
+- **K3s**: Lightweight Kubernetes distribution
+- **NFS Provisioner**: Dynamic persistent volume provisioning
+- **MetalLB** (optional): Load balancer for bare metal
+
+---
 
 ## 📦 Prerequisites
 
-#### Ubuntu/Debian Linux
+### System Requirements
+
+- **OS**: Linux (Ubuntu/Debian or similar)
+- **Ansible**: 2.10+
+- **Git**: Latest version
+- **ssh-pass**: For Ansible password authentication
+
+### Installation
+
+#### Ubuntu/Debian
 ```bash
-sudo apt update
-sudo apt install -y ansible git
-sudo apt install -y sshpass sudo sudo apt install -y net-tools
+sudo apt update && sudo apt install -y ansible git sshpass net-tools
 ```
 
 ### Software Versions
-- Ansible 2.10+
-- Raspberry Pi OS Lite 64-bit (latest)
-- K3s (installed via script - latest stable)
-- Helm 3.x (installed during setup)
+
+| Software | Version |
+|----------|---------|
+| Ansible | 2.10+ |
+| Raspberry Pi OS Lite | 64-bit (latest) |
+| K3s | Latest stable (installed via script) |
+| Helm | 3.x (installed during setup) |
+| Ubuntu LTS | 22.04+ (64-bit) |
+
+---
 
 ## 🏁 Quick Start
 
-### 1. Clone This Repository
+### Step 1: Clone Repository
 ```bash
 git clone https://github.com/isri12/homelab-pi-cluster.git
 cd homelab-pi-cluster
 ```
 
-### 2. Flash SD Cards and install ubuntu server LTS
-Use Raspberry Pi Imager to flash all 3 SD cards with:
-- **OS**: ubuntu server LTS (64-bit)
-- **SSH**: Enabled
-- **Username**: pi (TEMPORARY)
-- **Password**: [your-password]
-- **Hostname**: raspberrypi (TEMPORARY: will be changed by Ansible)
+### Step 2: Flash SD Cards
 
-### 3. Configure Your Inventory
+Use Raspberry Pi Imager to flash all 3 SD cards with:
+
+- **OS**: Ubuntu Server LTS (64-bit) for master, Raspberry Pi OS Lite (64-bit) for workers
+- **SSH**: Enabled
+- **Username**: `pi` (temporary)
+- **Password**: Your chosen password
+- **Hostname**: `raspberrypi` (will be changed by Ansible)
+
+### Step 3: Configure Inventory
+
+Edit your Pi IP addresses:
 
 ```bash
-# Edit with your Pi IP addresses
 nano ansible/inventory/hosts.yml
 ```
 
-Create  ansible password cred. 
+### Step 4: Setup Ansible Vault
+
+Create encrypted credentials:
+
 ```bash
+# Create vault file
 ansible-vault create ansible/inventory/group_vars/all/vault.yml
-```
 
-view
-```bash
+# View vault file
 ansible-vault view ansible/inventory/group_vars/all/vault.yml
-```
 
-edit
-```bash
+# Edit vault file
 ansible-vault edit ansible/inventory/group_vars/all/vault.yml
 ```
 
-test
+### Step 5: Test Ansible Connection
+
 ```bash
 ansible all -i ansible/inventory/hosts.yml -m ping --ask-vault-pass
 ```
 
-### 4. Test Ansible Connection
-```bash
-ansible all -i ansible/inventory/hosts.yml -m ping --ask-vault-pass
-```
+### Step 6: Run Automated Setup
 
-
-
-### 5. Run Automated Setup
 ```bash
 # Complete setup (20-30 minutes)
 ./scripts/setup-cluster.sh
 
 # Or run playbooks individually:
-# ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml
-
 ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml --ask-vault-pass
 ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/02-install-k3s.yml --ask-vault-pass
 ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-storage.yml --ask-vault-pass
 ```
-reboot workers
+
+### Step 7: Reboot Workers
+
 ```bash
 ansible workers -i ansible/inventory/hosts.yml -b -m reboot --ask-vault-pass
 ```
 
+### Step 8: Access Services
 
-### 6. Access Your Services
-After deployment completes:
-- **Grafana**: http://192.168.1.10:30080 (admin/changeme)
-- **Pi-hole**: http://192.168.1.100/admin
-- **Home Assistant**: http://192.168.1.101:8123
-- **N8n**: http://192.168.1.102:5678
+After deployment, access your services at:
+
+| Service | URL |
+|---------|-----|
+| Grafana | http://192.168.1.10:30080 |
+| Pi-hole | http://192.168.1.100/admin |
+| Home Assistant | http://192.168.1.101:8123 |
+| N8n | http://192.168.1.102:5678 |
+
+---
 
 ## 📚 Detailed Setup Guide
 
-### Step 1: Flash Raspberry Pi OS
+### Finding Pi IP Addresses
 
-1. **Download Raspberry Pi Imager**
-  - Ubuntu LTS 
+**Option A: Check Router's DHCP List**
+- Log into your router admin panel
+- Check connected devices
 
-2. **For each SD card:**
-
-   - Label cards: "Master", "Worker1", "Worker2"
-
-3. **Insert SD cards and power on Pis**
-
-### Step 2: Find Pi IP Addresses
-
-**Option A: Check your router's DHCP client list**
-
-**Option B: Network scan**
+**Option B: Network Scan**
 ```bash
 # macOS/Linux
 sudo nmap -sn 192.168.1.0/24 | grep -B 2 "Raspberry"
 
-# Or
+# Or check ARP table
 arp -a | grep -i "b8:27:eb\|dc:a6:32\|e4:5f:01"
 ```
 
-**Option C: Connect via hostname**
+**Option C: Use Hostname**
 ```bash
 ssh pi@raspberrypi.local
 ```
 
-### Step 3: Verify SSH Access
+### Verify SSH Access
+
 ```bash
 # Test each Pi
-ssh pi@192.168.1.10
-ssh pi@192.168.1.11
-ssh pi@192.168.1.12
-
-# Type 'exit' to disconnect
+ssh pi@192.168.1.XX
+ssh pi@192.168.1.XX
+ssh pi@192.168.1.XX
 ```
 
-### Step 4: Prepare USB Storage
+### Prepare USB Storage
 
-1. **Insert USB flash drive into Pi 4**
-2. **Identify the device**
+1. Insert USB flash drive into Pi 4
+2. Identify the device:
 ```bash
-ssh pi@192.168.1.10
-lsblk
-# Look for your USB drive (usually /dev/sda)
+ssh pi@192.168.1.XX
+lsblk  # Look for your USB drive (usually /dev/sda)
 ```
 
 The Ansible playbook will format and mount it automatically.
 
-### Step 5: Run Ansible Playbooks
+### Run Ansible Playbooks
 
 #### Playbook 1: Prepare Pis (10-15 minutes)
+
 ```bash
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml --ask-vault-pass
 ```
+
 **What it does:**
 - Updates all packages
 - Installs required software
@@ -281,9 +287,11 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis
 - Reboots if needed
 
 #### Playbook 2: Install K3s (5-10 minutes)
+
 ```bash
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/02-install-k3s.yml
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/02-install-k3s.yml --ask-vault-pass
 ```
+
 **What it does:**
 - Installs K3s on master node
 - Installs K3s agents on worker nodes
@@ -291,9 +299,11 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/02-install-k3s
 - Verifies cluster is ready
 
 #### Playbook 3: Setup Storage (2-5 minutes)
+
 ```bash
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-storage.yml
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-storage.yml --ask-vault-pass
 ```
+
 **What it does:**
 - Formats USB drive (ext4)
 - Mounts storage on master
@@ -301,64 +311,94 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-stora
 - Mounts NFS on workers
 - Creates storage directories
 
+### Configure K3s Storage Path
 
-
-### To update your K3s configuration to use your custom storage 
-/etc/systemd/system/k3s.service
+Edit K3s configuration on the master node:
 
 ```bash
+sudo nano /etc/systemd/system/k3s.service
+```
+
+Update the ExecStart line to include:
+
+```
 ExecStart=/usr/local/bin/k3s \
     server \
     --write-kubeconfig-mode 644 \
     --default-local-storage-path /mnt/storage
 ```
 
-What these flags do:
---write-kubeconfig-mode 644: This fixes the "permission denied" error you saw at the beginning. It allows your user (isri) to run kubectl commands without using sudo.
---default-local-storage-path /mnt/storage: This tells K3s that whenever an app (like Prometheus or Pi-hole) asks for "Local Storage," it should create the folders inside your /mnt/storage directory instead of the default system path.
+**Flag Explanations:**
+- `--write-kubeconfig-mode 644`: Allows users to run kubectl without sudo
+- `--default-local-storage-path /mnt/storage`: Uses custom storage for persistent volumes
 
+Apply changes:
 
-# 1. Reload the systemd manager to notice the file change
+```bash
 sudo systemctl daemon-reload
-
-# 2. Restart K3s
 sudo systemctl restart k3s
-
-# 3. Verify the status
 sudo systemctl status k3s
+```
 
 ### NFS Server Setup
-Step 1: Configure NFS Server (Run on pi-master)
-Install the NFS Server:
+
+#### Install NFS Server (on Pi 4 Master)
+
 ```bash
 sudo apt update && sudo apt install nfs-kernel-server -y
-Use code with caution.
 ```
-Export your directory:
-Open /etc/exports and add this line to share your storage with your cluster network:
-bash
+
+#### Configure NFS Export
+
+Edit `/etc/exports`:
+
+```bash
+sudo nano /etc/exports
+```
+
+Add this line:
+
 ```
 /mnt/storage *(rw,sync,no_subtree_check,no_root_squash)
 ```
-Use code with caution.
 
-(Note: * allows all IPs. For better security, replace * with your cluster subnet like 192.168.1.0/24).
-Apply changes:
-bash
+> **Note:** `*` allows all IPs. For better security, use your cluster subnet like `192.168.1.0/24`
+
+#### Apply NFS Configuration
+
+```bash
 sudo exportfs -a
 sudo systemctl restart nfs-kernel-server
-Use code with caution.
-
-
-### Step 6: Deploy Kubernetes Services
-
-#### Install Helm
-```bash
-curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 ```
 
-#### Add Helm Repositories
+### Deploy NFS Provisioner
+
 ```bash
+# Clone repository if not already done
+cd homelab-pi-cluster
+
+# Deploy NFS provisioner
+kubectl apply -f kubernetes/storage/nfs-provisioner.yaml
+
+# Wait for deployment to be ready
+kubectl wait --for=condition=available --timeout=300s \
+  deployment/nfs-client-provisioner -n nfs-provisioner
+
+# Verify
+kubectl get pods -n nfs-provisioner
+kubectl get storageclass
+
+# Set nfs-client as default storage class
+kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+```
+
+### Install Helm & Add Repositories
+
+```bash
+# Install Helm
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# Add Helm repositories
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo add grafana https://grafana.github.io/helm-charts
 helm repo add mojo2600 https://mojo2600.github.io
@@ -367,68 +407,10 @@ helm repo add pajikos http://pajikos.github.io/home-assistant-helm-chart/
 helm repo update
 ```
 
-On MAster NODE
-```bash
-cd ~
-git clone https://github.com/isri12/homelab-pi-cluster.git
-
-cd homelab-pi-cluster
-
-kubectl apply -f kubernetes/storage/nfs-provisioner.yaml
-```
-#### Deploy NFS Provisioner
-Before deploying apps that need storage, make sure the provisioner is actually running:
-```bash
-kubectl get pods -n nfs-provisioner
-```
-
-
-```bash
-kubectl apply -f kubernetes/storage/nfs-provisioner.yaml
-kubectl wait --for=condition=available --timeout=300s \
-  deployment/nfs-client-provisioner -n nfs-provisioner
-```
-isri@pi-master:~/homelab-pi-cluster$ kubectl get pods -n nfs-provisioner
-NAME                                      READY   STATUS    RESTARTS   AGE
-nfs-client-provisioner-65f7577f5b-94mnt   1/1     Running   0          2m12s
-isri@pi-master:~/homelab-pi-cluster$ kubectl get storageclass
-NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
-local-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  30d
-nfs-client (default)   nfs-storage             Delete          Immediate              false                  3m13s
-isri@pi-master:~/homelab-pi-cluster$ kubectl wait --for=condition=available --timeout=300s deployment/nfs-client-provisioner -n nfs-provisioner
-deployment.apps/nfs-client-provisioner condition met
-
-# Remove default annotation from local-path
-kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
-
-./scripts/deploy-with-docker.sh
-
-What will happen:
-Creates namespaces (pihole, home, n8n, monitoring)
-Deploys Pi-hole with PVC
-Deploys Home Assistant with PVC
-Deploys N8n with PVC
-Deploys Prometheus with PVC
-Deploys Grafana with PVC
-
-# Watch all pods
-watch -n 2 'kubectl get pods -A'
-
-# Or check each namespace
-kubectl get pods -n pihole -w
-kubectl get pods -n home -w
-kubectl get pods -n n8n -w
-kubectl get pods -n monitoring -w
-
-# Watch persistent volume claims being created
-watch kubectl get pvc -A
-
- 
- 
- or 
- manually
+### Deploy Applications
 
 #### Deploy Monitoring Stack
+
 ```bash
 kubectl create namespace monitoring
 helm install kube-prometheus prometheus-community/kube-prometheus-stack \
@@ -438,6 +420,7 @@ helm install kube-prometheus prometheus-community/kube-prometheus-stack \
 ```
 
 #### Deploy Pi-hole
+
 ```bash
 kubectl create namespace pihole
 helm install pihole mojo2600/pihole \
@@ -447,6 +430,7 @@ helm install pihole mojo2600/pihole \
 ```
 
 #### Deploy Home Assistant
+
 ```bash
 kubectl create namespace home
 helm install home-assistant k8s-at-home/home-assistant \
@@ -456,40 +440,30 @@ helm install home-assistant k8s-at-home/home-assistant \
 ```
 
 #### Deploy N8n
+
 ```bash
 kubectl apply -f kubernetes/apps/n8n/deployment.yaml
 ```
 
-### Step 7: Verify Deployment
+### Verify Deployment
+
 ```bash
-# Check all pods are running
+# Check cluster status
+kubectl cluster-info
+kubectl get nodes -o wide
+
+# Check all pods
 kubectl get pods --all-namespaces
 
 # Check storage
 kubectl get pvc --all-namespaces
+kubectl get storageclass
 
 # Check services
 kubectl get svc --all-namespaces
 
-# Check all nodes
-kubectl get nodes -o wide
-
-# Check all namespaces
-kubectl get namespaces
-
-# Check all pods across all namespaces
-kubectl get pods -A
-
-# Check pod status in each namespace
-kubectl get pods -n pihole
-kubectl get pods -n home
-kubectl get pods -n n8n
-kubectl get pods -n monitoring
-
-
-# Verify it's running
-kubectl get pods -n nfs-provisioner
-kubectl get storageclass
+# Watch pods being created
+watch -n 2 'kubectl get pods -A'
 ```
 
 
@@ -500,56 +474,59 @@ kubectl get storageclass
 
 ```
 homelab-pi-cluster/
-├── README.md                          # This file
+├── README.md                          # Main documentation
+├── details.md                         # Detailed setup guide (this file)
 ├── .gitignore
 │
 ├── ansible/                           # Ansible automation
 │   ├── inventory/
 │   │   ├── hosts.yml                  # Inventory with Pi IPs
 │   │   └── group_vars/
-│   │       └── all.yml                # Global variables
+│   │       └── all/
+│   │           └── vault.yml          # Encrypted credentials
 │   ├── playbooks/
 │   │   ├── 01-prepare-pis.yml         # Initial Pi setup
 │   │   ├── 02-install-k3s.yml         # K3s installation
 │   │   ├── 03-setup-storage.yml       # Storage configuration
-│   │   └── migrate-to-pi5-nas.yml     # Future: Pi 5 NAS migration
+│   │   ├── 00-crash-loop.yaml         # Crash loop fixes
+│   │   └── fix-cgroups-workers.yml    # Cgroup configuration
 │   └── roles/                         # Custom Ansible roles
-│       ├── common/
-│       ├── k3s-master/
-│       └── k3s-worker/
 │
 ├── kubernetes/                        # Kubernetes manifests
 │   ├── storage/
-│   │   └── nfs-provisioner.yaml       # NFS storage provisioner
+│   │   └── nfs-provisioner.yaml       # NFS provisioner deployment
 │   └── apps/
-│       ├── pihole/                    # Pi-hole configs
+│       ├── pihole/                    # Pi-hole Kubernetes configs
 │       ├── home-assistant/            # Home Assistant configs
-│       ├── n8n/                       # N8n workflow automation
+│       ├── n8n/                       # N8n automation configs
 │       │   └── deployment.yaml
-│       └── monitoring/                # Monitoring stack
+│       └── monitoring/                # Monitoring stack configs
 │
-├── helm-values/                       # Helm chart values
-│   ├── prometheus-stack-values.yaml
-│   ├── pihole-values.yaml
-│   └── home-assistant-values.yaml
+├── helm-values/                       # Helm chart custom values
+│   ├── prometheus-stack-values.yaml   # Prometheus & Grafana config
+│   ├── pihole-values.yaml             # Pi-hole Helm values
+│   └── home-assistant-values.yaml     # Home Assistant Helm values
 │
 ├── scripts/                           # Utility scripts
-│   ├── setup-cluster.sh               # Complete setup automation
-│   ├── migrate-to-pi5-nas.sh          # Storage migration
-│   ├── backup-cluster.sh              # Backup script
-│   └── restore-cluster.sh             # Restore script
+│   ├── setup-cluster.sh               # Complete automation script
+│   ├── deploy-app.sh                  # Deploy individual apps
+│   ├── deploy-with-docker.sh          # Docker-based deployment
+│   ├── check-cluster.sh               # Cluster health check
+│   └── check-c-group-issue.sh         # Cgroup diagnostics
 │
-└── docs/                              # Additional documentation
-    ├── architecture.md
-    ├── maintenance.md
-    └── troubleshooting.md
+├── docs/                              # Documentation files
+├── kubeconfig                         # Kubernetes config (generated)
+└── kubernetes/                        # Kubernetes configs
 ```
+
+---
 
 ## ⚙️ Configuration
 
-### Ansible Variables
+### Ansible Inventory
 
-Edit `ansible/inventory/hosts.yml`:
+Edit [ansible/inventory/hosts.yml](ansible/inventory/hosts.yml):
+
 ```yaml
 all:
   vars:
@@ -562,122 +539,151 @@ all:
         pi-master:
           ansible_host: 192.168.1.10
           node_ip: 192.168.1.10
+    
+    workers:
+      hosts:
+        pi-worker1:
+          ansible_host: 192.168.1.11
+        pi-worker2:
+          ansible_host: 192.168.1.12
 ```
 
 ### Storage Configuration
 
-Edit `ansible/playbooks/03-setup-storage.yml`:
+Edit [ansible/playbooks/03-setup-storage.yml](ansible/playbooks/03-setup-storage.yml):
+
 ```yaml
 vars:
-  usb_device: /dev/sda1              # USB drive device
-  mount_point: /mnt/storage          # Mount location
-  nfs_export_network: 192.168.1.0/24 # Your network
+  usb_device: /dev/sda1              # USB drive device path
+  mount_point: /mnt/storage          # Where to mount storage
+  nfs_export_network: 192.168.1.0/24 # Your cluster network
 ```
 
 ### Service Configuration
 
-#### Prometheus/Grafana
-Edit `helm-values/prometheus-stack-values.yaml`:
+#### Prometheus & Grafana
+
+Edit [helm-values/prometheus-stack-values.yaml](helm-values/prometheus-stack-values.yaml):
+
 ```yaml
 grafana:
   adminPassword: "your-secure-password"  # Change this!
   persistence:
     size: 5Gi
+    storageClassName: nfs-client
 ```
 
 #### Pi-hole
-Edit `helm-values/pihole-values.yaml`:
+
+Edit [helm-values/pihole-values.yaml](helm-values/pihole-values.yaml):
+
 ```yaml
 serviceDns:
-  loadBalancerIP: 192.168.1.100  # Your desired IP
+  loadBalancerIP: 192.168.1.100      # Desired IP for Pi-hole
 adminPassword: "your-secure-password"
 ```
 
 #### Home Assistant
-Edit `helm-values/home-assistant-values.yaml`:
+
+Edit [helm-values/home-assistant-values.yaml](helm-values/home-assistant-values.yaml):
+
 ```yaml
 service:
   main:
-    loadBalancerIP: 192.168.1.101  # Your desired IP
+    loadBalancerIP: 192.168.1.101     # Desired IP for Home Assistant
+    type: LoadBalancer
 ```
+
+---
 
 ## 🚀 Deployment
 
 ### Automated Deployment
+
 ```bash
-# Complete setup in one command
+# Complete setup in one command (20-30 minutes total)
 ./scripts/setup-cluster.sh
 ```
 
 ### Manual Deployment
-```bash
-# Step by step
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/02-install-k3s.yml
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-storage.yml
 
-# Deploy apps
+```bash
+# Step 1: Prepare all Pis
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml --ask-vault-pass
+
+# Step 2: Install K3s
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/02-install-k3s.yml --ask-vault-pass
+
+# Step 3: Setup storage
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/03-setup-storage.yml --ask-vault-pass
+
+# Step 4: Deploy NFS provisioner
 kubectl apply -f kubernetes/storage/nfs-provisioner.yaml
-helm install kube-prometheus prometheus-community/kube-prometheus-stack \
-  --namespace monitoring -f helm-values/prometheus-stack-values.yaml
-# ... repeat for other services
+
+# Step 5: Deploy applications
+./scripts/deploy-with-docker.sh
 ```
 
-### Verify Deployment
-```bash
-# Check cluster status
-kubectl get nodes
+### Deployment Verification
 
-# Check all pods
+```bash
+# Check cluster health
+kubectl cluster-info
+kubectl get nodes -o wide
+
+# Check all pods are running
 kubectl get pods --all-namespaces
 
-# Check storage
+# Check persistent volumes and claims
 kubectl get pvc --all-namespaces
 kubectl get storageclass
 
-# Check services
+# Check all services
 kubectl get svc --all-namespaces
+
+# Monitor pod creation
+watch -n 2 'kubectl get pods -A'
 ```
+
+---
 
 ## 💻 Usage
 
 ### Accessing Services
 
-#### Grafana
-- URL: http://192.168.1.10:30080
-- Username: `admin`
-- Password: Check `helm-values/prometheus-stack-values.yaml`
+#### Credentials Table
 
-#### Pi-hole
-- URL: http://192.168.1.100/admin
-- Password: Check `helm-values/pihole-values.yaml`
+| Service | URL | Username | Password | Notes |
+|---------|-----|----------|----------|-------|
+| **Grafana** | http://10.0.0.154:30080 | admin | changeme123 | Change immediately! |
+| **Pi-hole** | http://10.0.0.100/admin | — | changeme123 | DNS blocking & admin |
+| **Home Assistant** | http://10.0.0.101:8123 | — | — | First-time setup wizard |
+| **N8n** | http://10.0.0.102:5678 | admin | changeme123 | Workflow automation |
+| **Prometheus** | http://10.0.0.154:30090 | — | — | No authentication |
 
-#### Home Assistant
-- URL: http://192.168.1.101:8123
-- Initial setup wizard will guide you
+> ⚠️ **Security Warning:** Change all default passwords after initial setup!
 
-#### N8n
-- URL: http://192.168.1.102:5678
-- Username: `admin`
-- Password: Check `kubernetes/apps/n8n/deployment.yaml`
+### Common Kubernetes Commands
 
-### Kubernetes Commands
-
+#### Cluster Information
 ```bash
 # Get cluster info
 kubectl cluster-info
 
+# View nodes
+kubectl get nodes -o wide
+
 # View all resources
 kubectl get all --all-namespaces
+```
 
+#### Pod & Deployment Management
+```bash
 # View logs
 kubectl logs -n monitoring deployment/kube-prometheus-stack-grafana
 
 # Execute commands in pod
 kubectl exec -it -n home pod/home-assistant-xxx -- /bin/bash
-
-# Port forward to access service locally
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
 
 # Scale deployment
 kubectl scale deployment home-assistant -n home --replicas=2
@@ -686,39 +692,122 @@ kubectl scale deployment home-assistant -n home --replicas=2
 kubectl rollout restart deployment/home-assistant -n home
 ```
 
-### Accessing Kubeconfig
+#### Port Forwarding & Access
+```bash
+# Port forward to access service locally
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+
+# Connect to pod shell
+kubectl exec -it -n pihole <pod-name> -- /bin/bash
+```
+
+### Kubeconfig Setup
+
+Copy kubeconfig to your local machine:
 
 ```bash
 # Copy from Pi 4
 scp pi@192.168.1.10:/etc/rancher/k3s/k3s.yaml ~/.kube/config
 
-# Edit server address
+# Update server address to use Pi IP instead of localhost
 sed -i 's/127.0.0.1/192.168.1.10/g' ~/.kube/config
 
-# Test
+# Test connectivity
 kubectl get nodes
 ```
 
+### Accessing Pi-hole
+
+#### Via Web UI
+1. Open browser: http://10.0.0.100/admin
+2. Login with password from settings
+
+#### Change Admin Password
+```bash
+# SSH to master node
+ssh isri@10.0.0.154
+
+# Get Pi-hole pod name
+kubectl get pods -n pihole
+
+# Execute into container
+kubectl exec -it -n pihole pihole-xxxxxxxxxx-xxxxx -- /bin/bash
+
+# Change password
+pihole -a -p
+
+# Exit
+exit
+```
+
+### Grafana Setup
+
+#### Access Grafana
+1. Open: http://10.0.0.154:30080
+2. Login: admin/changeme123
+
+#### Configure Prometheus Data Source
+1. Click "Connections" → "Data sources"
+2. Click "Add data source"
+3. Select "Prometheus"
+4. Set URL to: `http://prometheus.monitoring.svc.cluster.local:9090`
+5. Click "Save & Test"
+
+#### Pre-installed Dashboards
+- Kubernetes / Compute Resources / Cluster
+- Kubernetes / Compute Resources / Node
+- Node Exporter / Nodes
+
+---
+
 ## 🔧 Maintenance
 
-### Update Cluster
+### Cluster Updates
+
 ```bash
-# Update all Pis
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml
+# Update all system packages
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/01-prepare-pis.yml --ask-vault-pass
 
 # Upgrade K3s
 ansible all -i ansible/inventory/hosts.yml -m shell \
-  -a "curl -sfL https://get.k3s.io | sh -" -b
+  -a "curl -sfL https://get.k3s.io | sh -" -b --ask-vault-pass
 ```
 
-### Backup
+### Monitoring Cluster Health
 
-#### Backup Storage
+#### Check Resource Usage
 ```bash
-# Automated backup (runs daily at 2 AM)
-kubectl apply -f kubernetes/cronjobs/backup.yaml
+# Node resource consumption
+kubectl top nodes
 
-# Manual backup
+# Pod resource consumption
+kubectl top pods --all-namespaces
+
+# Disk space usage
+ansible all -i ansible/inventory/hosts.yml -a "df -h"
+
+# Memory usage
+ansible all -i ansible/inventory/hosts.yml -a "free -h"
+```
+
+#### View Logs
+```bash
+# K3s logs on master
+ssh pi@192.168.1.10
+sudo journalctl -u k3s -f
+
+# Application logs
+kubectl logs -n home deployment/home-assistant --tail=100 -f
+
+# All cluster events
+kubectl get events --all-namespaces --sort-by='.lastTimestamp'
+```
+
+### Backup & Recovery
+
+#### Backup Storage Data
+```bash
+# Manual backup (run on master)
 ssh pi@192.168.1.10
 sudo rsync -av /mnt/storage/ /mnt/storage/backups/$(date +%Y%m%d)/
 ```
@@ -729,106 +818,98 @@ ssh pi@192.168.1.10
 sudo k3s etcd-snapshot save --name backup-$(date +%Y%m%d)
 ```
 
-### Monitoring
+### Disk Space Management
 
-#### Check Resource Usage
 ```bash
-# Node resources
-kubectl top nodes
-
-# Pod resources
-kubectl top pods --all-namespaces
-
-# Disk usage
+# Check available space on all nodes
 ansible all -i ansible/inventory/hosts.yml -a "df -h"
 
-# Memory usage
-ansible all -i ansible/inventory/hosts.yml -a "free -h"
-```
-
-#### Access Grafana Dashboards
-1. Open Grafana: http://192.168.1.10:30080
-2. Navigate to Dashboards
-3. Pre-installed dashboards:
-   - Kubernetes / Compute Resources / Cluster
-   - Kubernetes / Compute Resources / Node
-   - Node Exporter / Nodes
-
-### Logs
-
-```bash
-# View K3s logs
+# Check NFS storage usage
 ssh pi@192.168.1.10
-sudo journalctl -u k3s -f
+du -sh /mnt/storage/*
 
-# Application logs
-kubectl logs -n home deployment/home-assistant --tail=100 -f
-
-# All events
-kubectl get events --all-namespaces --sort-by='.lastTimestamp'
+# Clean old Docker images (if using Docker)
+ansible all -i ansible/inventory/hosts.yml -a "docker image prune -a"
 ```
+
+---
 
 ## 🔍 Troubleshooting
 
 ### Ansible Connection Issues
 
-**Problem**: `ansible all -m ping` fails
+**Problem:** `ansible all -m ping` fails
+
 ```bash
-# Check SSH manually
+# Check SSH access manually
 ssh pi@192.168.1.10
 
-# Verify IP addresses in hosts.yml
+# Verify IP addresses in inventory
 cat ansible/inventory/hosts.yml
 
-# Check SSH keys
+# Reset SSH key cache
 ssh-keygen -R 192.168.1.10
+
+# Test with verbose output
+ansible all -i ansible/inventory/hosts.yml -m ping --ask-vault-pass -vvv
 ```
 
 ### K3s Installation Issues
 
-**Problem**: K3s fails to start
+**Problem:** K3s fails to start or crashes
+
 ```bash
-# Check logs
+# Check K3s logs
 ssh pi@192.168.1.10
 sudo journalctl -u k3s -n 100
 
-# Verify cgroups
+# Verify cgroups are enabled
 cat /proc/cgroups
 
-# Check if swap is disabled
+# Check if swap is disabled (required for K3s)
 free -h
 
 # Reinstall K3s
 curl -sfL https://get.k3s.io | sh -
+
+# Check service status
+sudo systemctl status k3s
 ```
 
 ### Storage Issues
 
-**Problem**: Pods stuck in "Pending" state
+**Problem:** Pods stuck in "Pending" state
+
 ```bash
-# Check PVCs
+# Check PVC status
 kubectl get pvc --all-namespaces
 
 # Check NFS provisioner
 kubectl get pods -n nfs-provisioner
 kubectl logs -n nfs-provisioner deployment/nfs-client-provisioner
 
-# Test NFS mount manually
+# Describe the pending pod for error details
+kubectl describe pod <pod-name> -n <namespace>
+
+# Test NFS mount manually (from worker node)
 ssh pi@192.168.1.11
 sudo mount 192.168.1.10:/mnt/storage /mnt/test
+mount | grep storage
+sudo umount /mnt/test
 ```
 
-**Problem**: USB drive not mounting
+**Problem:** USB drive not mounting
+
 ```bash
 ssh pi@192.168.1.10
 
 # Check if drive is detected
 lsblk
 
-# Check mount status
+# Check current mounts
 mount | grep storage
 
-# Check fstab
+# Check /etc/fstab configuration
 cat /etc/fstab
 
 # Manually remount
@@ -837,39 +918,46 @@ sudo mount -a
 
 ### Pod Issues
 
-**Problem**: Pod won't start
+**Problem:** Pod won't start or keeps restarting
+
 ```bash
-# Describe pod for details
+# Get detailed pod information
 kubectl describe pod <pod-name> -n <namespace>
 
-# Check events
+# Check events for error details
 kubectl get events -n <namespace> --sort-by='.lastTimestamp'
 
-# Check logs
+# View pod logs
 kubectl logs <pod-name> -n <namespace>
+kubectl logs <pod-name> -n <namespace> --previous  # For crashed pods
 
-# Delete and recreate
+# Delete and recreate pod
 kubectl delete pod <pod-name> -n <namespace>
 ```
 
-**Problem**: Out of memory on Pi 3
+**Problem:** Out of memory on Pi 3 workers
+
 ```bash
 # Check memory usage
 kubectl top nodes
 kubectl top pods --all-namespaces
 
-# Add node selector to schedule on Pi 4
+# Add node selector to schedule on Pi 4 instead
 kubectl edit deployment <name> -n <namespace>
 # Add:
-#   nodeSelector:
-#     kubernetes.io/hostname: pi-master
+#   spec:
+#     template:
+#       spec:
+#         nodeSelector:
+#           kubernetes.io/hostname: pi-master
 ```
 
 ### Network Issues
 
-**Problem**: Can't access services
+**Problem:** Can't access services from outside cluster
+
 ```bash
-# Check service IPs
+# Check service IPs and types
 kubectl get svc --all-namespaces
 
 # Check if MetalLB is working (if installed)
@@ -877,123 +965,29 @@ kubectl get pods -n metallb-system
 
 # Test from master node
 ssh pi@192.168.1.10
-curl http://192.168.1.100  # Pi-hole
+curl -v http://192.168.1.100  # Test Pi-hole
+curl -v http://192.168.1.101:8123  # Test Home Assistant
+
+# Check DNS resolution
+nslookup home-assistant.home.svc.cluster.local
 ```
 
-echo "======================================================================"
-echo "🏠 Home Lab Access Information"
-echo "======================================================================"
-echo ""
-echo "🛡️  Pi-hole (Ad Blocking):"
-echo "   URL:      http://10.0.0.100/admin"
-echo "   Password: changeme123"
-echo ""
-echo "🏠 Home Assistant:"
-echo "   URL:      http://10.0.0.101:8123"
-echo "   Note:     First-time setup wizard"
-echo ""
-echo "⚡ N8n (Automation):"
-echo "   URL:      http://10.0.0.102:5678"
-echo "   Username: admin"
-echo "   Password: changeme123"
-echo ""
-echo "📊 Prometheus (Metrics):"
-echo "   URL:      http://10.0.0.154:30090"
-echo "   Note:     No login required"
-echo ""
-echo "📈 Grafana (Dashboards):"
-echo "   URL:      http://10.0.0.154:30080"
-echo "   Username: admin"
-echo "   Password: changeme123"
-echo ""
-echo "======================================================================"
-echo "⚠️  SECURITY: Change all default passwords!"
-echo "======================================================================"
+### Cgroup Issues
 
-🌐 Access Your Services:
-========================
+**Problem:** Cgroup v2 memory controller errors
 
-     Pi-hole:         http://10.0.0.100/admin (password: changeme123)
-  🏠 Home Assistant:  http://10.0.0.101:8123
-  ⚡ N8n:             http://10.0.0.102:5678 (admin/changeme123)
-  📊 Prometheus:      http://10.0.0.154:30090
-  📈 Grafana:         http://10.0.0.154:30080 (admin/changeme123)
-
-
-# SSH to master
-ssh isri@10.0.0.154
-
-# Get the Pi-hole pod name
-kubectl get pods -n pihole
-
-# Execute into the container
-kubectl exec -it -n pihole pihole-xxxxxxxxxx-xxxxx -- /bin/bash
-
-# Change password
-pihole -a -p
-
-# Exit
-exit
-
-# Test Pi-hole
-curl http://10.0.0.100/admin | head -20
-
-# Test Home Assistant
-curl http://10.0.0.101:8123
-
-# Test N8n
-curl http://10.0.0.102:5678
-
-# Test Prometheus
-curl http://10.0.0.154:30090
-
-# Test Grafana
-curl http://10.0.0.154:30080
-
-🖥️ From Your Browser
-Simply open these URLs in your browser:
-
-Pi-hole: http://10.0.0.100/admin
-Home Assistant: http://10.0.0.101:8123
-N8n: http://10.0.0.102:5678
-Prometheus: http://10.0.0.154:30090
-Grafana: http://10.0.0.154:30080
-
-📱 Bonus: Setup Grafana Data Source
-After logging into Grafana:
-
-Click "Connections" → "Data sources"
-Click "Add data source"
-Select "Prometheus"
-Set URL to: http://prometheus.monitoring.svc.cluster.local:9090
-Click "Save & Test"
-
-Now you can create dashboards showing your cluster metrics!
-🎯 Summary Table
-ServiceURLUsernamePasswordNotesPi-holehttp://10.0.0.100/admin-changeme123Password onlyHome Assistanthttp://10.0.0.101:8123(create)(create)First-time setupN8nhttp://10.0.0.102:5678adminchangeme123Basic authPrometheushttp://10.0.0.154:30090--No authGrafanahttp://10.0.0.154:30080adminchangeme123Web login
-All passwords are changeme123 - please change them! 🔒
-Try accessing them now! Let me know if any don't work. 🚀
-
-### Performance Issues
-
-**Problem**: Cluster is slow
 ```bash
-# Check CPU/memory
-kubectl top nodes
-kubectl top pods --all-namespaces
+# Check cgroup version
+cat /proc/cgroups
 
-# Check disk I/O
-ssh pi@192.168.1.10
-sudo iotop
+# Fix cgroup issues on workers
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/fix-cgroups-workers.yml --ask-vault-pass
 
-# Check network
-ansible all -i ansible/inventory/hosts.yml -a "iftop -t -s 2"
-
-# Reduce resource requests
-kubectl edit deployment <name> -n <namespace>
+# Reboot workers
+ansible workers -i ansible/inventory/hosts.yml -b -m reboot --ask-vault-pass
 ```
 
-### Common Commands for Debugging
+### General Debugging Commands
 
 ```bash
 # Full cluster status
@@ -1002,82 +996,72 @@ kubectl get all --all-namespaces
 # Describe any resource
 kubectl describe <resource-type> <name> -n <namespace>
 
-# Get logs
-kubectl logs <pod-name> -n <namespace> --tail=100
-
-# Execute shell in pod
-kubectl exec -it <pod-name> -n <namespace> -- /bin/sh
+# Get detailed resource info
+kubectl get <resource> <name> -n <namespace> -o yaml
 
 # Check node status
 kubectl describe node pi-master
 
-# Force delete stuck pod
+# Force delete stuck resources
 kubectl delete pod <pod-name> -n <namespace> --grace-period=0 --force
 
 # Restart entire deployment
 kubectl rollout restart deployment/<name> -n <namespace>
 ```
 
+---
+
 ## 🔮 Future Upgrades
 
 ### Phase 2: Pi 5 NAS Integration
 
-When you add your Pi 5 NAS:
+When ready to add a Pi 5 with NAS:
 
 1. **Setup Pi 5 with TrueNAS or OpenMediaVault**
 2. **Run migration playbook:**
-```bash
-./scripts/migrate-to-pi5-nas.sh
-```
+   ```bash
+   ./scripts/migrate-to-pi5-nas.sh
+   ```
 
-This will:
-- Mount Pi 5 NAS on all nodes
-- Copy data from USB to NAS
-- Update NFS provisioner
-- Zero downtime migration
+**What it does:**
+- Mounts Pi 5 NAS on all nodes
+- Migrates data from USB to NAS
+- Updates NFS provisioner configuration
+- Zero-downtime migration
 
 ### Potential Additions
 
-- **Longhorn**: Distributed storage for high availability
-- **Cert-Manager**: Automatic SSL certificates
-- **Traefik/Nginx Ingress**: Reverse proxy
+- **Longhorn**: Distributed block storage for HA
+- **Cert-Manager**: Automatic SSL certificate management
+- **Traefik/Nginx Ingress**: Reverse proxy & load balancing
 - **ArgoCD**: GitOps continuous deployment
-- **Velero**: Backup and disaster recovery
+- **Velero**: Automated backup and disaster recovery
 - **Kubernetes Dashboard**: Web UI for cluster management
 - **MinIO**: S3-compatible object storage
 - **PostgreSQL/MySQL**: Database services
 - **Redis**: In-memory data store
-- **MQTT Broker**: For IoT devices
+- **MQTT Broker**: IoT device communication
 
-## 🤝 Contributing
+---
 
-Contributions are welcome! Please:
+## 📞 Support & Resources
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### Helpful Commands
 
-## 📝 License
+```bash
+# Quick cluster check
+./scripts/check-cluster.sh
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+# Detailed diagnostics
+kubectl describe node <node-name>
+kubectl get events -A --sort-by='.lastTimestamp'
 
-## 🙏 Acknowledgments
+# Monitor in real-time
+watch -n 2 'kubectl get pods -A'
+watch kubectl top nodes
+```
 
-- K3s team for lightweight Kubernetes
-- Rancher for K3s documentation
-- Helm community for chart repositories
-- Ansible community for excellent documentation
-- Raspberry Pi Foundation
-
-## 📞 Support
-
-- **Issues**: https://github.com/yourusername/homelab-pi-cluster/issues
-- **Discussions**: https://github.com/yourusername/homelab-pi-cluster/discussions
-- **Wiki**: https://github.com/yourusername/homelab-pi-cluster/wiki
-
-## 📚 Additional Resources
+### Documentation Links
 
 - [K3s Documentation](https://docs.k3s.io/)
 - [Ansible Documentation](https://docs.ansible.com/)
@@ -1085,8 +1069,27 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [Helm Documentation](https://helm.sh/docs/)
 - [Raspberry Pi Documentation](https://www.raspberrypi.com/documentation/)
 
+### Issues & Discussions
+
+- **Issues**: Check [Issues.md](Issues.md) for known problems
+- **Learning Path**: See [cka-learning-path.md](cka-learning-path.md) for CKA preparation
+
+---
+
+## 📝 License
+
+This project is licensed under the MIT License.
+
+## 🙏 Acknowledgments
+
+- K3s team for lightweight Kubernetes
+- Rancher for excellent K3s documentation
+- Helm community for chart repositories
+- Ansible community for automation tools
+- Raspberry Pi Foundation for amazing hardware
+
 ---
 
 **Built with ❤️ for learning Kubernetes and DevOps**
 
-Last Updated: December 2025
+*Last Updated: February 2026*
