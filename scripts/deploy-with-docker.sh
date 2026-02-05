@@ -181,7 +181,6 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/hostname: pi-master
-      hostNetwork: true
       containers:
       - name: home-assistant
         image: ghcr.io/home-assistant/home-assistant:stable
