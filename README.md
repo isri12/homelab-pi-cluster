@@ -37,23 +37,20 @@ This project automates the deployment of a lightweight Kubernetes cluster optimi
 
 ```mermaid
 graph TD
-    Internet((☁️ Internet)) <--> Router[🏠 Home Router]
+  
     
     subgraph DevEnv [💻 Dev Environment]
-        Laptop[Developer Laptop<br/>(Ansible/Kubectl)]
+        Laptop[Developer Laptop Ansible/Kubectl]
     end
     
-    subgraph Cluster [🍓 Raspberry Pi Cluster]
-        Master[Master Node<br/>(Pi 4)]
-        Worker1[Worker 1<br/>(Pi 3B+)]
-        Worker2[Worker 2<br/>(Pi 3B+)]
+    
+    subgraph Cluster [ Raspberry Pi Cluster]
+        Master[Master Node - Pi 4]
+        Worker1[Worker 1 - Pi 3B+]
+        Worker2[Worker 2 -  Pi 3B+]
     end
 
-    Router <--> Laptop
-    Router <--> Master
-    Router <--> Worker1
-    Router <--> Worker2
-    
+
     Laptop -.->|SSH / Ansible| Master
     Laptop -.->|SSH / Ansible| Worker1
     Laptop -.->|SSH / Ansible| Worker2
