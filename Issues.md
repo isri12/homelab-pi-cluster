@@ -1148,4 +1148,13 @@ homelab-pi-cluster/
 
 ---
 
-This project demonstrates enterprise-level DevOps skills applied to physical infrastructure, showing understanding of both the "how" and "why" of modern infrastructure management. 🚀
+# Get detailed information about home-assistant why it's pending
+kubectl describe pod home-assistant-88d7c44db-dvxjm -n home
+# Restart the deployment (correct)
+kubectl rollout restart deployment/home-assistant -n home
+kubectl get deployment -n home -o yaml | head -100
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml && kubectl scale deployment home-assistant --replicas=1 -n home
+
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml && kubectl scale deployment home-assistant --replicas=1 -n home
+deployment.apps/home-assistant scaled
+---
