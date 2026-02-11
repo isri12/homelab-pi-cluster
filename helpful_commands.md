@@ -784,10 +784,10 @@ Events:     kubectl get events -n <namespace> --sort-by=.lastTimestamp
 Resources:  kubectl top nodes && kubectl top pods -A
 
 === ACCESS URLs ===
-Pi-hole:    http://10.0.0.100/admin (password: changeme123)
+Pi-hole:    http://10.0.0.100/admin 
 Home Assistant: http://10.0.0.101:8123
-N8n:        http://10.0.0.102:5678 (admin/changeme123)
+N8n:        http://10.0.0.102:5678 
 Prometheus: http://10.0.0.154:30090
-Grafana:    http://10.0.0.154:30080 (admin/changeme123)
+Grafana:    http://10.0.0.154:30080 
 ```
 
