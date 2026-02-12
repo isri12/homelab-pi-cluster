@@ -987,6 +987,33 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/fix-cgroups-wo
 ansible workers -i ansible/inventory/hosts.yml -b -m reboot --ask-vault-pass
 ```
 
+### Helm prometheus grafana update
+#### Free up the ports so Helm can use them
+kubectl delete svc -n monitoring prometheus grafana
+
+#### Stop the old pods so they don't waste RAM (optional but recommended)
+kubectl delete deployment -n monitoring prometheus grafana
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+```
+
+```bash
+helm upgrade --install kube-prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --create-namespace \
+  -f helm-values/prometheus-stack-values.yaml \
+  --wait \
+  --timeout 15m
+```
+#### Check Pods
+kubectl get pods -n monitoring
+
+#### Check the NEW PVCs (Helm creates its own, ignoring the old 'grafana-data')
+kubectl get pvc -n monitoring
+
+
 ### General Debugging Commands
 
 ```bash

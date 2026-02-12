@@ -1,0 +1,65 @@
+# Prometheus & Grafana Configuration for Raspberry Pi Cluster
+# Optimized for Pi 4 Master (4GB RAM) and Pi 3 Workers
+
+grafana:
+  # Default admin password (CHANGE THIS on first login!)
+  adminPassword: "changeme123"
+  
+  # Expose Grafana on a static NodePort for easy access
+  service:
+    type: NodePort
+    nodePort: 30080
+    
+  # Persist dashboards and users across restarts
+  persistence:
+    enabled: true
+    storageClassName: nfs-client
+    accessModes:
+      - ReadWriteOnce
+    size: 5Gi
+    
+  # Pin to Master node (Pi 4) to save Worker resources
+  nodeSelector:
+    kubernetes.io/hostname: pi-master
+    
+  # Resource limits for Pi hardware
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+prometheus:
+  # Expose Prometheus UI
+  service:
+    type: NodePort
+    nodePort: 30090
+
+  prometheusSpec:
+    # Data retention period
+    retention: 7d
+    
+    # Persist metrics data
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: nfs-client
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+              
+    # Pin to Master node (Pi 4) - Prometheus is memory hungry!
+    nodeSelector:
+      kubernetes.io/hostname: pi-master
+      
+    # Resource limits
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi  # Allow it to burst on the 4GB Pi 4

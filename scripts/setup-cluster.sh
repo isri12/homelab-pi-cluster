@@ -148,7 +148,7 @@ helm upgrade --install kube-prometheus prometheus-community/kube-prometheus-stac
   --namespace monitoring \
   -f helm-values/prometheus-stack-values.yaml \
   --wait \
-  --timeout 10m || echo "⚠️  Prometheus installation failed or timed out"
+  --timeout 15m || echo "⚠️  Prometheus installation failed or timed out"
 
 echo ""
 echo "🛡️  Deploying Pi-hole..."
