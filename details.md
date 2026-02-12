@@ -988,11 +988,19 @@ ansible workers -i ansible/inventory/hosts.yml -b -m reboot --ask-vault-pass
 ```
 
 ### Helm prometheus grafana update
+
 #### Free up the ports so Helm can use them
 kubectl delete svc -n monitoring prometheus grafana
 
 #### Stop the old pods so they don't waste RAM (optional but recommended)
 kubectl delete deployment -n monitoring prometheus grafana
+
+```bash
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# Replace the empty address with your Master Node IP
+sed -i 's|https://:6443|https://10.0.0.154:6443|g' ~/.kube/config
+```
 
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
