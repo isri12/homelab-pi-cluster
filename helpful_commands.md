@@ -775,11 +775,27 @@ alias ha-logs='kubectl logs -f deployment/home-assistant -n home'
 ```
 === QUICK COMMANDS ===
 Status:     kubectl get pods -A
+
+kubectl get ns
+
+# Check if the pod is running
+kubectl get pods -n home
+
+# Check the service IP (LoadBalancer)
+kubectl get svc -n home
+
+kubectl describe pod -n <NAMESPACE> <NAME>
+
 Logs:       kubectl logs -f <pod> -n <namespace>
 Exec:       kubectl exec -it <pod> -n <namespace> -- /bin/bash
 Restart:    kubectl rollout restart deployment/<name> -n <namespace>
 Scale:      kubectl scale deployment/<name> --replicas=N -n <namespace>
+
 Delete:     kubectl delete pod <pod> -n <namespace>
+kubectl delete pod -n home --all
+kubectl delete namespace home
+
+
 Events:     kubectl get events -n <namespace> --sort-by=.lastTimestamp
 Resources:  kubectl top nodes && kubectl top pods -A
 

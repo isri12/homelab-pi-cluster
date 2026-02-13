@@ -161,12 +161,20 @@ helm upgrade --install pihole mojo2600/pihole \
 
 echo ""
 echo "🏠 Deploying Home Assistant..."
+
 kubectl create namespace home 2>/dev/null || true
-helm upgrade --install home-assistant k8s-at-home/home-assistant \
+
+helm repo add bjw-s https://bjw-s-labs.github.io/helm-charts || true
+helm repo update
+helm repo list
+
+helm upgrade --install home-assistant bjw-s/app-template \
   --namespace home \
+  --create-namespace \
   -f helm-values/home-assistant-values.yaml \
   --wait \
-  --timeout 5m || echo "⚠️  Home Assistant installation failed or timed out"
+  --timeout 5m
+
 
 echo ""
 echo "⚡ Deploying N8n..."

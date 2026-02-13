@@ -1,0 +1,35 @@
+controllers:
+  main:
+    replicas: 1
+    containers:
+      main:
+        image:
+          repository: ghcr.io/home-assistant/home-assistant
+          tag: stable
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+
+service:
+  main:
+    controller: main
+    type: LoadBalancer
+    ports:
+      http:
+        port: 8123
+
+defaultPodOptions:
+  nodeSelector:
+    node-role.kubernetes.io/worker: "true"
+
+persistence:
+  config:
+    enabled: true
+    storageClass: local-path
+    accessMode: ReadWriteOnce
+    size: 5Gi
+    globalMounts:
+      - path: /config
